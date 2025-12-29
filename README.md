@@ -13,10 +13,10 @@ A curated collection of n8n automation templates to streamline your workflows.
 
 ## Available Templates
 
-| Template | Description |
-|----------|-------------|
-| [Instagram to X](./Instagram%20to%20X) | Automatically cross-post your Instagram content to X (Twitter) |
-| [Auto-Translate YouTube Video Content](./Auto-Translate%20YouTube%20Video%20Content%20with%20Google%20Gemini%20AI) | Translate YouTube video titles and descriptions using Google Gemini AI |
+| Template | Description | n8n.io |
+|----------|-------------|--------|
+| [Instagram to X](./Instagram%20to%20X) | Automatically cross-post your Instagram content to X (Twitter) | - |
+| [Auto-Translate YouTube Video Content](./Auto-Translate%20YouTube%20Video%20Content%20with%20Google%20Gemini%20AI) | Translate YouTube video titles and descriptions using Google Gemini AI | [View](https://n8n.io/workflows/9543-auto-translate-youtube-video-content-with-google-gemini-ai/) |
 
 ---
 
