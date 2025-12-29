@@ -1,0 +1,302 @@
+{
+    "meta": {
+      "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72",
+      "templateCredsSetupCompleted": true
+    },
+    "nodes": [
+      {
+        "id": "e72521fb-2e79-4709-89e3-24ba75a9cf91",
+        "name": "Get row(s)",
+        "type": "n8n-nodes-base.dataTable",
+        "position": [
+          224,
+          -80
+        ],
+        "parameters": {
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "postId",
+                "keyValue": "={{ $json.data[0].id }}"
+              }
+            ]
+          },
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "EZOpIWaJsj24UrGu",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/EZOpIWaJsj24UrGu",
+            "cachedResultName": "Instagram Posts"
+          }
+        },
+        "typeVersion": 1,
+        "alwaysOutputData": true
+      },
+      {
+        "id": "2ccfa875-0fe3-4dc6-ae1a-d80f82fe9cdf",
+        "name": "Insert row",
+        "type": "n8n-nodes-base.dataTable",
+        "position": [
+          896,
+          -80
+        ],
+        "parameters": {
+          "columns": {
+            "value": {
+              "postId": "={{ $('HTTP Request').item.json.data[0].id }}"
+            },
+            "schema": [
+              {
+                "id": "postId",
+                "type": "string",
+                "display": true,
+                "removed": false,
+                "readOnly": false,
+                "required": false,
+                "displayName": "postId",
+                "defaultMatch": false
+              }
+            ],
+            "mappingMode": "defineBelow",
+            "matchingColumns": [
+              "postId"
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {},
+          "dataTableId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "EZOpIWaJsj24UrGu",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/EZOpIWaJsj24UrGu",
+            "cachedResultName": "Instagram Posts"
+          }
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "32ae820e-5101-422b-b972-75be5531455b",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          0,
+          -80
+        ],
+        "parameters": {
+          "url": "https://graph.instagram.com/me/media",
+          "options": {},
+          "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"1\"\n}",
+          "sendQuery": true,
+          "specifyQuery": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "httpBearerAuth"
+        },
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "5xW3IOTiDM0UmUbr",
+            "name": "Bearer YOUR_TOKEN_HERE Meta Developer Instagram Account"
+          }
+        },
+        "typeVersion": 4.2,
+        "alwaysOutputData": true
+      },
+      {
+        "id": "fc8d4f4e-2a06-4d32-a7eb-61ad4767cdc5",
+        "name": "Create Tweet",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          672,
+          -80
+        ],
+        "parameters": {
+          "text": "=▶️ IG: {{ $('HTTP Request').item.json.data[0].caption }}\n{{ $('HTTP Request').item.json.data[0].permalink }}",
+          "additionalFields": {}
+        },
+        "credentials": {
+          "twitterOAuth2Api": {
+            "id": "Rm6H3keTsAY0galG",
+            "name": "X account"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "8da4dcad-607c-47d4-8f2f-2d630a104f28",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          -224,
+          -80
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 12
+              }
+            ]
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "f5b2d032-9cfb-4371-9118-3ee7c4352fa5",
+        "name": "Sticky Note12",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -1008,
+          -336
+        ],
+        "parameters": {
+          "width": 678,
+          "height": 432,
+          "content": "## Instagram Poster\n\nI wanted to automatically share posts from Instagram to my X account.\n\n### Requirements\n\n- Meta Developer Portal Configuration + Instagram Integration (Token only)\n- X Developer Portal Credentials\n\n### Setup\n- Set your  credentials for **Bearer YOUR_TOKEN_HERE** in the **HTTP Request** node\n- Create a Data Table from the **Get row(s)** node\n  - Add a string field called **postId**\n  - Select the table for also the **Insert row** node\n- Set your Twitter Credentials in the **Create Tweet** node\n\n### Customization\n- By default, the trigger runs every 3 hours. Adjust it based on how often you post.\n- By default the trigger is every 3 hours, adjust at will.\n- If you need more information from Instagram, update the Query Parameters in the **HTTP Request** node\n- The **Create Tweet** node uses the text field to define how the post will be structured\n  - By default it starts with \"▶️ IG:\" followed by the IG text and link\n\n"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "c3603b49-306f-45c6-a897-f68e15cc849d",
+        "name": "Sticky Note2",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -256,
+          -192
+        ],
+        "parameters": {
+          "color": 6,
+          "width": 420,
+          "height": 304,
+          "content": "## Get Latest Post"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "02ba8f09-55e9-476f-bdb0-ba8d45d4e395",
+        "name": "If",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          448,
+          -80
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "eab5894a-31d7-43f4-8866-104c416eed3f",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists",
+                  "singleValue": true
+                },
+                "leftValue": "={{ $json.postId }}",
+                "rightValue": ""
+              }
+            ]
+          },
+          "looseTypeValidation": true
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "829df439-a816-42aa-a0e5-a1997e032f22",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          192,
+          -192
+        ],
+        "parameters": {
+          "color": 7,
+          "width": 404,
+          "height": 304,
+          "content": "## Check If Already Posted"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "886f8fc0-e85e-47d9-af71-b40e6d2244be",
+        "name": "Sticky Note1",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          624,
+          -192
+        ],
+        "parameters": {
+          "color": 3,
+          "width": 420,
+          "height": 304,
+          "content": "## Post on X and Store ID"
+        },
+        "typeVersion": 1
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "If": {
+        "main": [
+          [
+            {
+              "node": "Create Tweet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get row(s)": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Tweet": {
+        "main": [
+          [
+            {
+              "node": "Insert row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Get row(s)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
