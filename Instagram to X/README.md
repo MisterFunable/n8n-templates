@@ -11,5 +11,5 @@
 * Set your X Credentials in the **Create Tweet** node
 
 ### Additional Links
-* Getting Instagram Posts with N8N (The Simple Way Part 1)(https://medium.com/@mister.funable/getting-instagram-posts-with-n8n-the-simple-way-part-1-c66cb5217054)
-* N8N Medium List (https://medium.com/@mister.funable/list/n8n-fc9fe38c3afe)
+* [Getting Instagram Posts with N8N (The Simple Way Part 1)](https://medium.com/@mister.funable/getting-instagram-posts-with-n8n-the-simple-way-part-1-c66cb5217054)
+* [N8N Medium List](https://medium.com/@mister.funable/list/n8n-fc9fe38c3afe)
