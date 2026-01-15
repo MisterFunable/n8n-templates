@@ -1,0 +1,451 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "value": "oOxou5oOQXuS4cQY",
+            "mode": "list",
+            "cachedResultName": "Instagram To YouTube",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/oOxou5oOQXuS4cQY"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "postId",
+                "keyValue": "={{ $json.id }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "position": [
+          -32,
+          -96
+        ],
+        "id": "b5177b98-2bff-433e-ad70-74757ccfd0aa",
+        "name": "Get row(s)",
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "dataTableId": {
+            "__rl": true,
+            "value": "oOxou5oOQXuS4cQY",
+            "mode": "list",
+            "cachedResultName": "Instagram To YouTube",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/oOxou5oOQXuS4cQY"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "youtubeId": "={{ $json.uploadId }}",
+              "postId": "={{ $('Loop Over Items').item.json.id }}"
+            },
+            "matchingColumns": [
+              "postId"
+            ],
+            "schema": [
+              {
+                "id": "postId",
+                "displayName": "postId",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "youtubeId",
+                "displayName": "youtubeId",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "position": [
+          1088,
+          -32
+        ],
+        "id": "5132382d-f1f3-4d75-a5d2-0f756c212f7e",
+        "name": "Insert row"
+      },
+      {
+        "parameters": {
+          "url": "https://graph.instagram.com/me/media",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "httpBearerAuth",
+          "sendQuery": true,
+          "specifyQuery": "json",
+          "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"25\"\n}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -704,
+          -32
+        ],
+        "id": "96cac9cc-a47e-4bfe-8ca5-f7ea80330f49",
+        "name": "HTTP Request",
+        "alwaysOutputData": true,
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "5xW3IOTiDM0UmUbr",
+            "name": "Bearer Auth Meta Developer Instagram Doll Enable"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "eab5894a-31d7-43f4-8866-104c416eed3f",
+                "leftValue": "={{ $json.postId }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          192,
+          -96
+        ],
+        "id": "eb14e7a4-d19b-42e3-b3ad-91d68e892dcc",
+        "name": "If"
+      },
+      {
+        "parameters": {
+          "content": "## Post to Youtube and Store IG and YT ID",
+          "height": 304,
+          "width": 612,
+          "color": 3
+        },
+        "id": "9af1eac9-63ab-4743-b374-c5b4d0cf6e1b",
+        "name": "Sticky Note1",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          608,
+          -176
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "ffd3b7ab-4ac6-4c71-8ee1-a6c93732a701",
+                "name": "URL",
+                "type": "string",
+                "value": "="
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "af1bb684-3d64-4f73-b550-0ef69b82dec1",
+        "name": "Output URL",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          -32,
+          -288
+        ],
+        "typeVersion": 3.4
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          -256,
+          -32
+        ],
+        "id": "29cf8471-7804-4379-932d-9d6081109d89",
+        "name": "Loop Over Items"
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "data",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [
+          -480,
+          -32
+        ],
+        "id": "2674a3af-fb2c-4a2a-9d69-bd973ceb7718",
+        "name": "Split Out"
+      },
+      {
+        "parameters": {
+          "amount": 15
+        },
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          416,
+          -96
+        ],
+        "id": "d8143f4f-2412-4a0b-8713-6b1dd31d421c",
+        "name": "Wait",
+        "webhookId": "0489833a-4a5a-4ac4-969f-f3094638cb4f"
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 0 * * *"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -928,
+          -32
+        ],
+        "id": "3bd84370-eecd-4119-94ba-25257feb43c4",
+        "name": "Schedule Trigger"
+      },
+      {
+        "parameters": {
+          "url": "={{ $('Loop Over Items').item.json.media_url }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file"
+              }
+            }
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          720,
+          -96
+        ],
+        "id": "0656626f-98f5-48d2-ab56-132a7621520a",
+        "name": "HTTP Request1"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Get the caption from the Loop Over Items node\nconst caption = $('Loop Over Items').item.json.caption || '';\n\n// YouTube title max length\nconst MAX_TITLE_LENGTH = 100;\n\n// Find the position of the first hashtag\nconst firstHashtagIndex = caption.indexOf('#');\n\nlet shortTitle;\n\nif (firstHashtagIndex === -1) {\n  // No hashtags found, use the whole caption\n  shortTitle = caption.trim();\n} else {\n  // Get the text before the first hashtag\n  const textBeforeHashtag = caption.substring(0, firstHashtagIndex).trim();\n  \n  // Find the end of the first hashtag (next space or end of string)\n  const afterFirstHashtag = caption.substring(firstHashtagIndex);\n  const firstHashtagEnd = afterFirstHashtag.indexOf(' ');\n  const firstHashtag = firstHashtagEnd === -1 \n    ? afterFirstHashtag \n    : afterFirstHashtag.substring(0, firstHashtagEnd);\n  \n  // Try to include the first hashtag if it fits within the limit\n  const titleWithHashtag = `${textBeforeHashtag} ${firstHashtag}`;\n  \n  if (titleWithHashtag.length <= MAX_TITLE_LENGTH) {\n    shortTitle = titleWithHashtag;\n  } else if (textBeforeHashtag.length <= MAX_TITLE_LENGTH) {\n    shortTitle = textBeforeHashtag;\n  } else {\n    // Truncate if still too long\n    shortTitle = textBeforeHashtag.substring(0, MAX_TITLE_LENGTH - 3) + '...';\n  }\n}\n\n// Return the shortened title\nreturn {\n  shortTitle: shortTitle,\n  originalCaption: caption\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          560,
+          -96
+        ],
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "name": "Shorten Title"
+      },
+      {
+        "parameters": {
+          "resource": "video",
+          "operation": "upload",
+          "title": "={{ $('Shorten Title').item.json.shortTitle }}",
+          "regionCode": "CL",
+          "categoryId": "24",
+          "options": {
+            "defaultLanguage": "en",
+            "description": "={{ $('Shorten Title').item.json.originalCaption }}",
+            "privacyStatus": "public"
+          }
+        },
+        "type": "n8n-nodes-base.youTube",
+        "typeVersion": 1,
+        "position": [
+          880,
+          -96
+        ],
+        "id": "831a2b16-1b3a-4693-9401-2dbcca355c31",
+        "name": "Upload a video",
+        "credentials": {
+          "youTubeOAuth2Api": {
+            "id": "LZbKs6ZEc2SEt766",
+            "name": "YouTube Account Dollenable"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Get row(s)": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert row": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Split Out",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "Wait",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Items": {
+        "main": [
+          [
+            {
+              "node": "Output URL",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get row(s)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Out": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait": {
+        "main": [
+          [
+            {
+              "node": "Shorten Title",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Shorten Title": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request1": {
+        "main": [
+          [
+            {
+              "node": "Upload a video",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload a video": {
+        "main": [
+          [
+            {
+              "node": "Insert row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+    }
+  }
