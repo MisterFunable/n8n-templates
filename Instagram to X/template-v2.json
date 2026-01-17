@@ -1,0 +1,518 @@
+{
+    "meta": {
+      "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72",
+      "templateCredsSetupCompleted": true
+    },
+    "nodes": [
+      {
+        "id": "8da4dcad-607c-47d4-8f2f-2d630a104f28",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          -448,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 6
+              }
+            ]
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "32ae820e-5101-422b-b972-75be5531455b",
+        "name": "Fetch Instagram Posts",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          -224,
+          0
+        ],
+        "parameters": {
+          "url": "https://graph.instagram.com/me/media",
+          "options": {},
+          "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"10\"\n}",
+          "sendQuery": true,
+          "specifyQuery": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "httpBearerAuth"
+        },
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "5xW3IOTiDM0UmUbr",
+            "name": "Bearer YOUR_TOKEN_HERE Meta Developer Instagram Account"
+          }
+        },
+        "typeVersion": 4.2,
+        "alwaysOutputData": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "split-out-posts",
+        "name": "Split Out Posts",
+        "type": "n8n-nodes-base.splitOut",
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "fieldToSplitOut": "data",
+          "options": {}
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "loop-over-posts",
+        "name": "Loop Over Posts",
+        "type": "n8n-nodes-base.splitInBatches",
+        "position": [
+          224,
+          0
+        ],
+        "parameters": {
+          "options": {}
+        },
+        "typeVersion": 3
+      },
+      {
+        "id": "e72521fb-2e79-4709-89e3-24ba75a9cf91",
+        "name": "Check If Already Posted",
+        "type": "n8n-nodes-base.dataTable",
+        "position": [
+          448,
+          64
+        ],
+        "parameters": {
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "postId",
+                "keyValue": "={{ $json.id }}"
+              }
+            ]
+          },
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "EZOpIWaJsj24UrGu",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/EZOpIWaJsj24UrGu",
+            "cachedResultName": "Instagram Posts"
+          }
+        },
+        "typeVersion": 1,
+        "alwaysOutputData": true
+      },
+      {
+        "id": "02ba8f09-55e9-476f-bdb0-ba8d45d4e395",
+        "name": "If Not Posted Yet",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          672,
+          64
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "eab5894a-31d7-43f4-8866-104c416eed3f",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists",
+                  "singleValue": true
+                },
+                "leftValue": "={{ $json.postId }}",
+                "rightValue": ""
+              }
+            ]
+          },
+          "looseTypeValidation": true
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "format-tweet-text",
+        "name": "Format Tweet Text",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          896,
+          0
+        ],
+        "parameters": {
+          "jsCode": "// Get the post data from the loop\nconst post = $('Loop Over Posts').item.json;\nconst caption = post.caption || '';\nconst permalink = post.permalink || '';\nconst postId = post.id;\n\n// Twitter character limit\nconst MAX_TWEET_LENGTH = 280;\nconst PREFIX = '▶️ IG: ';\n\n// Calculate available space for caption\n// Format: PREFIX + caption + space + permalink\nconst permalinkLength = permalink.length + 1; // +1 for space before permalink\nconst prefixLength = PREFIX.length;\nconst availableChars = MAX_TWEET_LENGTH - prefixLength - permalinkLength - 3; // -3 for potential \"...\"\n\nlet finalCaption = caption;\nlet wasTruncated = false;\n\nif (caption.length > availableChars) {\n  // Truncate at word boundary if possible\n  let truncated = caption.substring(0, availableChars);\n  const lastSpace = truncated.lastIndexOf(' ');\n  \n  // Only use word boundary if we don't lose too much text\n  if (lastSpace > availableChars * 0.7) {\n    truncated = truncated.substring(0, lastSpace);\n  }\n  \n  finalCaption = truncated + '...';\n  wasTruncated = true;\n}\n\n// Build the final tweet text\nconst tweetText = `${PREFIX}${finalCaption} ${permalink}`;\n\nreturn [{\n  json: {\n    postId: postId,\n    tweetText: tweetText,\n    originalCaption: caption,\n    permalink: permalink,\n    wasTruncated: wasTruncated,\n    charCount: tweetText.length\n  }\n}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "fc8d4f4e-2a06-4d32-a7eb-61ad4767cdc5",
+        "name": "Create Tweet",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          1120,
+          0
+        ],
+        "parameters": {
+          "text": "={{ $json.tweetText }}",
+          "additionalFields": {}
+        },
+        "credentials": {
+          "twitterOAuth2Api": {
+            "id": "Rm6H3keTsAY0galG",
+            "name": "X account"
+          }
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "check-tweet-success",
+        "name": "Tweet Succeeded?",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          1344,
+          0
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "tweet-success-check",
+                "operator": {
+                  "type": "string",
+                  "operation": "exists",
+                  "singleValue": true
+                },
+                "leftValue": "={{ $json.id }}",
+                "rightValue": ""
+              }
+            ]
+          },
+          "looseTypeValidation": true
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "2ccfa875-0fe3-4dc6-ae1a-d80f82fe9cdf",
+        "name": "Save Posted ID",
+        "type": "n8n-nodes-base.dataTable",
+        "position": [
+          1568,
+          -64
+        ],
+        "parameters": {
+          "columns": {
+            "value": {
+              "postId": "={{ $('Format Tweet Text').item.json.postId }}"
+            },
+            "schema": [
+              {
+                "id": "postId",
+                "type": "string",
+                "display": true,
+                "removed": false,
+                "readOnly": false,
+                "required": false,
+                "displayName": "postId",
+                "defaultMatch": false
+              }
+            ],
+            "mappingMode": "defineBelow",
+            "matchingColumns": [
+              "postId"
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {},
+          "dataTableId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "EZOpIWaJsj24UrGu",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/EZOpIWaJsj24UrGu",
+            "cachedResultName": "Instagram Posts"
+          }
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "log-tweet-error",
+        "name": "Log Tweet Error",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          1568,
+          128
+        ],
+        "parameters": {
+          "options": {},
+          "assignments": {
+            "assignments": [
+              {
+                "id": "error-log",
+                "name": "error",
+                "type": "string",
+                "value": "=Tweet failed for post {{ $('Format Tweet Text').item.json.postId }}"
+              },
+              {
+                "id": "timestamp",
+                "name": "timestamp",
+                "type": "string",
+                "value": "={{ new Date().toISOString() }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 3.4
+      },
+      {
+        "id": "output-done",
+        "name": "Done",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          224,
+          -192
+        ],
+        "parameters": {
+          "options": {},
+          "assignments": {
+            "assignments": [
+              {
+                "id": "status",
+                "name": "status",
+                "type": "string",
+                "value": "Workflow completed"
+              }
+            ]
+          }
+        },
+        "typeVersion": 3.4
+      },
+      {
+        "id": "f5b2d032-9cfb-4371-9118-3ee7c4352fa5",
+        "name": "Sticky Note - Instructions",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -1232,
+          -256
+        ],
+        "parameters": {
+          "width": 678,
+          "height": 512,
+          "content": "## Instagram to X Poster (v2 - Improved)\n\nAutomatically share Instagram posts to X/Twitter.\n\n### Improvements in v2\n- Fetches 10 posts instead of 1 (catches missed posts)\n- Smart caption truncation (respects word boundaries)\n- Error handling for failed tweets\n- Runs every 6 hours instead of 12\n\n### Requirements\n- Meta Developer Portal Configuration + Instagram Integration (Token)\n- X Developer Portal Credentials\n\n### Setup\n1. Set your credentials for **Bearer Auth** in the **Fetch Instagram Posts** node\n2. Create a Data Table from the **Check If Already Posted** node\n   - Add a string field called **postId**\n   - Select the same table for **Save Posted ID** node\n3. Set your Twitter Credentials in the **Create Tweet** node\n\n### Customization\n- Adjust trigger interval in **Schedule Trigger** node\n- Modify tweet format in **Format Tweet Text** code node\n- Change the number of posts fetched by editing the limit parameter\n\n### Token Expiration Warning\nInstagram tokens expire every 60 days. Set a calendar reminder to refresh!"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "sticky-fetch",
+        "name": "Sticky Note - Fetch",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -480,
+          -112
+        ],
+        "parameters": {
+          "color": 6,
+          "width": 480,
+          "height": 304,
+          "content": "## 1. Fetch Multiple Posts\nGets up to 10 recent Instagram posts to catch any that were missed between runs."
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "sticky-check",
+        "name": "Sticky Note - Check",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          416,
+          -112
+        ],
+        "parameters": {
+          "color": 7,
+          "width": 420,
+          "height": 384,
+          "content": "## 2. Deduplication\nCheck each post against the data table. Skip if already posted."
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "sticky-post",
+        "name": "Sticky Note - Post",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          864,
+          -176
+        ],
+        "parameters": {
+          "color": 3,
+          "width": 740,
+          "height": 500,
+          "content": "## 3. Format & Post\n- Truncates caption to fit Twitter's 280 char limit\n- Posts to X\n- Saves ID on success\n- Logs errors on failure"
+        },
+        "typeVersion": 1
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Fetch Instagram Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Instagram Posts": {
+        "main": [
+          [
+            {
+              "node": "Split Out Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Out Posts": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Posts": {
+        "main": [
+          [
+            {
+              "node": "Done",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Check If Already Posted",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check If Already Posted": {
+        "main": [
+          [
+            {
+              "node": "If Not Posted Yet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If Not Posted Yet": {
+        "main": [
+          [
+            {
+              "node": "Format Tweet Text",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Loop Over Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Tweet Text": {
+        "main": [
+          [
+            {
+              "node": "Create Tweet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Tweet": {
+        "main": [
+          [
+            {
+              "node": "Tweet Succeeded?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tweet Succeeded?": {
+        "main": [
+          [
+            {
+              "node": "Save Posted ID",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Log Tweet Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Posted ID": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Log Tweet Error": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }

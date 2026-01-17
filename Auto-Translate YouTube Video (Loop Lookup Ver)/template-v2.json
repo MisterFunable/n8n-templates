@@ -1,0 +1,814 @@
+{
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "51555efc-1116-409a-a4d0-43e9dd86389b",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [
+          -1312,
+          0
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 6
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -1312,
+          192
+        ],
+        "id": "schedule-trigger",
+        "name": "Schedule Trigger (Optional)"
+      },
+      {
+        "parameters": {
+          "mode": "raw",
+          "jsonOutput": "{\n  \"languages\": {\n    \"english\": \"en\",\n    \"spanish\": \"es-419\",\n    \"japanese\": \"ja\",\n    \"portuguese\": \"pt-BR\",\n    \"german\": \"de\"\n  }\n}\n",
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "id": "37d5c20f-57f1-48a3-ab7f-2f121295a3f4",
+        "name": "Define Languages",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          -1088,
+          0
+        ],
+        "typeVersion": 3.4
+      },
+      {
+        "parameters": {
+          "resource": "video",
+          "limit": 15,
+          "filters": {},
+          "options": {
+            "order": "date"
+          }
+        },
+        "id": "bfa05d7e-0ec9-429b-a242-21558b2d9e78",
+        "name": "Get Recent Videos",
+        "type": "n8n-nodes-base.youTube",
+        "position": [
+          -864,
+          0
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "youTubeOAuth2Api": {
+            "id": "LOC6v46faIXzn4Ws",
+            "name": "YouTube account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "id.videoId",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [
+          -640,
+          0
+        ],
+        "id": "890c5a2f-77e8-4c8b-b16d-c6f70cddf3ba",
+        "name": "Split Out"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          -416,
+          0
+        ],
+        "id": "a352b382-581e-4a36-9c21-6691ba597179",
+        "name": "Loop Over Items"
+      },
+      {
+        "parameters": {
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "value": "7LcOeZDDaikW6moz",
+            "mode": "list",
+            "cachedResultName": "YouTube Translation",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/7LcOeZDDaikW6moz"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "postId",
+                "keyValue": "={{ $json['id.videoId'] }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "position": [
+          -192,
+          64
+        ],
+        "id": "6ac5c86e-2827-4389-9220-923fa1b786d5",
+        "name": "Check If Already Translated",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "eab5894a-31d7-43f4-8866-104c416eed3f",
+                "leftValue": "={{ $json.postId }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          32,
+          64
+        ],
+        "id": "1a0fe8f5-fb5a-4980-b0f2-3890273f3d10",
+        "name": "If Not Translated Yet"
+      },
+      {
+        "parameters": {
+          "resource": "video",
+          "operation": "get",
+          "videoId": "={{ $('Split Out').item.json['id.videoId'] }}",
+          "options": {}
+        },
+        "id": "6580c26b-6135-40fc-b243-188d5d3fa4e8",
+        "name": "Fetch Video Details",
+        "type": "n8n-nodes-base.youTube",
+        "position": [
+          256,
+          0
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "youTubeOAuth2Api": {
+            "id": "LOC6v46faIXzn4Ws",
+            "name": "YouTube account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Backup original content before translation\nconst video = $input.first().json;\n\nconst backup = {\n  videoId: video.id,\n  originalTitle: video.snippet.title,\n  originalDescription: video.snippet.description,\n  defaultLanguage: video.snippet.defaultLanguage || 'en',\n  backupTimestamp: new Date().toISOString(),\n  categoryId: video.snippet.categoryId,\n  tags: video.snippet.tags || []\n};\n\nreturn [{ json: backup }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          0
+        ],
+        "id": "backup-original",
+        "name": "Backup Original Content"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Get default language from the backup\nconst defaultLang = $input.first().json.defaultLanguage || 'en';\n\n// Get language mapping from Define Languages node\nconst nameToCode = $('Define Languages').first().json.languages || {};\n\n// Build result excluding the default language\nconst entries = Object.entries(nameToCode).filter(([, code]) => {\n  // Normalize language codes for comparison (handle variants like es-419 vs es)\n  const baseCode = code.split('-')[0];\n  const baseDefault = defaultLang.split('-')[0];\n  return baseCode !== baseDefault;\n});\n\nconst languages = entries.map(([name]) => name);\nconst keys = Object.fromEntries(entries);\n\n// Return with backup data\nreturn [{\n  json: {\n    ...$input.first().json,\n    defaultLang,\n    languages,\n    keys,\n    languageCount: languages.length\n  }\n}];"
+        },
+        "id": "23c204f9-1aa1-4319-8c82-93516cd4430a",
+        "name": "Determine Target Languages",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          704,
+          0
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "amount": 15
+        },
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          928,
+          0
+        ],
+        "id": "8e218d86-acec-4cf7-aaf2-9a12bd928ca9",
+        "name": "Wait (Rate Limit)",
+        "webhookId": "63e6e2ac-3726-41f2-bc12-81d9b5c97814"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "52e0358d-4cf8-4a2d-8e69-b00df4af7bc9",
+        "name": "Google Gemini Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+        "position": [
+          1152,
+          192
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "googlePalmApi": {
+            "id": "AA17xDpfDPBIXegL",
+            "name": "Google Gemini(PaLM) Api account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "sessionIdType": "customKey",
+          "sessionKey": "translation-session"
+        },
+        "id": "d7e3349b-d12d-4b00-8908-10585317ebc7",
+        "name": "Simple Memory",
+        "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+        "position": [
+          1280,
+          192
+        ],
+        "typeVersion": 1.3
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{\n\t\"title\": \"object\",\n    \"description\": \"object\",\n    \"tags\": \"object\"\n}"
+        },
+        "id": "ffaf395a-83b3-4911-a623-5bc0f36ef064",
+        "name": "Structured Output Parser",
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "position": [
+          1408,
+          192
+        ],
+        "typeVersion": 1.3
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=You are a professional YouTube content translator. Your task is to translate video metadata while maintaining SEO value and cultural relevance.\n\n## SOURCE CONTENT\n- Default Language: {{ $json.defaultLang }}\n- Title: {{ $json.originalTitle }}\n- Description: {{ $json.originalDescription }}\n\n## TARGET LANGUAGES\nTranslate to: {{ $json.languages.join(', ') }}\n\n## TRANSLATION RULES\n1. **Titles**: Keep under 100 characters. Preserve brand names and technical terms. Maintain SEO keywords.\n2. **Descriptions**: Translate naturally, adapt idioms culturally (don't translate literally). Keep URLs unchanged.\n3. **Consistency**: Use consistent terminology across title and description.\n4. **Tone**: Match the original tone (casual, professional, educational, etc.)\n\n## SOCIAL LINKS TO APPEND\nAdd these links at the end of each translated description with \"Follow me on:\" translated to the target language:\n- Linktree: https://linktr.ee/YourUser\n- Instagram: https://instagram.com/YourUser\n- Twitter: https://x.com/YourUser\n\n## OUTPUT FORMAT\nReturn ONLY valid JSON with this exact structure (using ISO 639-1 language codes in lowercase):\n\n```json\n{\n  \"LANG_CODE\": {\n    \"title\": \"Translated title here\",\n    \"description\": \"Translated description here\"\n  }\n}\n```\n\nExample for Spanish (es) and Japanese (ja):\n```json\n{\n  \"es\": { \"title\": \"Titulo en Español\", \"description\": \"Descripción...\" },\n  \"ja\": { \"title\": \"日本語タイトル\", \"description\": \"説明文...\" }\n}\n```\n\nDo NOT include any text outside the JSON object.",
+          "hasOutputParser": true,
+          "options": {}
+        },
+        "id": "cc130dfb-24da-403b-9bcf-119f52e19b11",
+        "name": "AI Translator",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "maxTries": 2,
+        "position": [
+          1200,
+          0
+        ],
+        "retryOnFail": true,
+        "typeVersion": 2.2,
+        "waitBetweenTries": 5000
+      },
+      {
+        "parameters": {
+          "jsCode": "// Validate translation output\nconst input = $input.first().json;\nconst translations = input.output || {};\nconst expectedLanguages = $('Determine Target Languages').first().json.keys;\n\nconst issues = [];\nconst validTranslations = {};\n\n// Check each expected language\nfor (const [langName, langCode] of Object.entries(expectedLanguages)) {\n  // Normalize the code (handle variants)\n  const baseCode = langCode.split('-')[0].toLowerCase();\n  \n  // Look for the translation (try exact code first, then base code)\n  let translation = translations[langCode] || translations[baseCode];\n  \n  if (!translation) {\n    issues.push(`Missing translation for ${langName} (${langCode})`);\n    continue;\n  }\n  \n  // Validate title\n  if (!translation.title || translation.title.trim() === '') {\n    issues.push(`Empty title for ${langName}`);\n  } else if (translation.title.length > 100) {\n    issues.push(`Title too long for ${langName}: ${translation.title.length} chars (max 100)`);\n    // Truncate\n    translation.title = translation.title.substring(0, 97) + '...';\n  }\n  \n  // Validate description\n  if (!translation.description || translation.description.trim() === '') {\n    issues.push(`Empty description for ${langName}`);\n  }\n  \n  // Use the expected language code (not the AI's code)\n  validTranslations[langCode] = translation;\n}\n\nconst isValid = Object.keys(validTranslations).length > 0;\n\nreturn [{\n  json: {\n    translations: validTranslations,\n    validationIssues: issues,\n    isValid: isValid,\n    translatedCount: Object.keys(validTranslations).length,\n    expectedCount: Object.keys(expectedLanguages).length,\n    // Pass through backup data\n    videoId: $('Backup Original Content').first().json.videoId,\n    originalTitle: $('Backup Original Content').first().json.originalTitle,\n    originalDescription: $('Backup Original Content').first().json.originalDescription,\n    defaultLang: $('Determine Target Languages').first().json.defaultLang,\n    categoryId: $('Backup Original Content').first().json.categoryId,\n    tags: $('Backup Original Content').first().json.tags\n  }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1488,
+          0
+        ],
+        "id": "validate-translations",
+        "name": "Validate Translations"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "valid-check",
+                "leftValue": "={{ $json.isValid }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1712,
+          0
+        ],
+        "id": "check-valid",
+        "name": "Translations Valid?"
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "https://www.googleapis.com/youtube/v3/videos?part=snippet,localizations",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "youTubeOAuth2Api",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{\n{\n  id: $json.videoId,\n  snippet: {\n    defaultLanguage: $json.defaultLang,\n    title: $json.originalTitle,\n    description: $json.originalDescription,\n    categoryId: $json.categoryId,\n    tags: $json.tags\n  },\n  localizations: $json.translations\n}\n}}",
+          "options": {}
+        },
+        "id": "a6f36b3b-52f8-44cb-aaba-e82288f6c5d7",
+        "name": "Update YouTube Localizations",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1936,
+          -64
+        ],
+        "typeVersion": 4.2,
+        "credentials": {
+          "youTubeOAuth2Api": {
+            "id": "pUBXAvMPWo0DlxB2",
+            "name": "YouTube Account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "dataTableId": {
+            "__rl": true,
+            "value": "7LcOeZDDaikW6moz",
+            "mode": "list",
+            "cachedResultName": "YouTube Translation",
+            "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/7LcOeZDDaikW6moz"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "postId": "={{ $('Validate Translations').item.json.videoId }}"
+            },
+            "matchingColumns": [
+              "postId"
+            ],
+            "schema": [
+              {
+                "id": "postId",
+                "displayName": "postId",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "position": [
+          2160,
+          -64
+        ],
+        "id": "cffb05cd-6a7a-40f7-a106-5f71545430dc",
+        "name": "Mark as Translated"
+      },
+      {
+        "id": "log-validation-issues",
+        "name": "Log Validation Issues",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          1936,
+          128
+        ],
+        "parameters": {
+          "options": {},
+          "assignments": {
+            "assignments": [
+              {
+                "id": "error-log",
+                "name": "warning",
+                "type": "string",
+                "value": "=Translation validation failed for video {{ $json.videoId }}: {{ $json.validationIssues.join(', ') }}"
+              },
+              {
+                "id": "timestamp",
+                "name": "timestamp",
+                "type": "string",
+                "value": "={{ new Date().toISOString() }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 3.4
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "ffd3b7ab-4ac6-4c71-8ee1-a6c93732a701",
+                "name": "status",
+                "type": "string",
+                "value": "Workflow completed"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "c479f563-7f14-4fe9-a1fc-1111d7209cd7",
+        "name": "Done",
+        "type": "n8n-nodes-base.set",
+        "position": [
+          -416,
+          -192
+        ],
+        "typeVersion": 3.4
+      },
+      {
+        "parameters": {
+          "content": "## YouTube Video Translator (v2 - Improved)\n\nTranslate YouTube video titles and descriptions using Google Gemini AI.\n\n### Improvements in v2\n- **Dual trigger support**: Manual OR scheduled (every 6 hours)\n- **Translation validation**: Checks length, completeness before applying\n- **Original content backup**: Stores original before modification\n- **Improved AI prompt**: Better translation quality with SEO focus\n- **Error logging**: Tracks validation issues for debugging\n- **Language code normalization**: Handles variants (es-419, pt-BR, etc.)\n\n### Requirements\n- YouTube OAuth2 Credentials\n- Google Gemini (PaLM) API Key\n\n### Setup\n1. Set YouTube credentials in **Get Recent Videos** and **Update YouTube Localizations** nodes\n2. Set Gemini API key in **Google Gemini Chat Model** node\n3. Create Data Table with field: `postId`\n4. Edit **Define Languages** node to set your target languages\n\n### Language Configuration\nEdit the JSON in **Define Languages** node:\n```json\n{\n  \"languages\": {\n    \"english\": \"en\",\n    \"spanish\": \"es-419\",\n    \"japanese\": \"ja\",\n    \"portuguese\": \"pt-BR\",\n    \"german\": \"de\"\n  }\n}\n```\n\n### Trigger Options\n- **Manual**: Click \"Execute Workflow\" button\n- **Scheduled**: Connect the Schedule Trigger node to Define Languages (currently disconnected)\n\n### Validation Checks\n- Title under 100 characters (auto-truncated if longer)\n- Non-empty title and description\n- All expected languages present",
+          "height": 880,
+          "width": 678
+        },
+        "id": "6f261b26-a3b8-4517-b91d-ed8c94c2d9cf",
+        "name": "Sticky Note - Instructions",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -2320,
+          -336
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## 1. Trigger & Setup\nManual trigger (default) or enable Schedule Trigger by connecting it.",
+          "height": 400,
+          "width": 420,
+          "color": 6
+        },
+        "id": "sticky-trigger",
+        "name": "Sticky Note - Trigger",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -1344,
+          -144
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## 2. Deduplication\nSkip videos that were already translated.",
+          "height": 384,
+          "width": 388,
+          "color": 7
+        },
+        "id": "aef6f33f-668c-4b64-ba32-d4906a4f5234",
+        "name": "Sticky Note - Check",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          -224,
+          -112
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## 3. Fetch & Backup\nGet video details and backup original content before modification.",
+          "height": 304,
+          "width": 500,
+          "color": 7
+        },
+        "id": "sticky-backup",
+        "name": "Sticky Note - Backup",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          224,
+          -144
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## 4. AI Translation\nGoogle Gemini translates with context-aware prompt for YouTube SEO.",
+          "height": 304,
+          "width": 420,
+          "color": 7
+        },
+        "id": "61783771-0ee9-4621-a014-6561b3651920",
+        "name": "Sticky Note - AI",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1088,
+          -144
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## 5. Validate & Apply\nCheck translation quality before updating YouTube. Log issues if invalid.",
+          "height": 400,
+          "width": 580,
+          "color": 3
+        },
+        "id": "4d08da2a-3c82-4338-9885-324cda39bfc9",
+        "name": "Sticky Note - Apply",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          1600,
+          -208
+        ],
+        "typeVersion": 1
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Define Languages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Define Languages": {
+        "main": [
+          [
+            {
+              "node": "Get Recent Videos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Recent Videos": {
+        "main": [
+          [
+            {
+              "node": "Split Out",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Out": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Items": {
+        "main": [
+          [
+            {
+              "node": "Done",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Check If Already Translated",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check If Already Translated": {
+        "main": [
+          [
+            {
+              "node": "If Not Translated Yet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If Not Translated Yet": {
+        "main": [
+          [
+            {
+              "node": "Fetch Video Details",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Video Details": {
+        "main": [
+          [
+            {
+              "node": "Backup Original Content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Backup Original Content": {
+        "main": [
+          [
+            {
+              "node": "Determine Target Languages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Determine Target Languages": {
+        "main": [
+          [
+            {
+              "node": "Wait (Rate Limit)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait (Rate Limit)": {
+        "main": [
+          [
+            {
+              "node": "AI Translator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Gemini Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Translator",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Simple Memory": {
+        "ai_memory": [
+          [
+            {
+              "node": "AI Translator",
+              "type": "ai_memory",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Structured Output Parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "AI Translator",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Translator": {
+        "main": [
+          [
+            {
+              "node": "Validate Translations",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Translations": {
+        "main": [
+          [
+            {
+              "node": "Translations Valid?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Translations Valid?": {
+        "main": [
+          [
+            {
+              "node": "Update YouTube Localizations",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Log Validation Issues",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update YouTube Localizations": {
+        "main": [
+          [
+            {
+              "node": "Mark as Translated",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark as Translated": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Log Validation Issues": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+    }
+  }
