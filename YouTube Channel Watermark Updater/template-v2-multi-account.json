@@ -1,0 +1,302 @@
+{
+  "meta": {
+    "instanceId": "youtube-watermark-updater-multi-v2"
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [-600, 0],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "setup-accounts-1",
+      "name": "Setup Accounts",
+      "type": "n8n-nodes-base.code",
+      "position": [-400, 0],
+      "parameters": {
+        "jsCode": "// Configure your YouTube credential IDs here\n// You can find these in n8n: Credentials → YouTube OAuth2 API → ID (in URL or settings)\n\nconst accounts = [\n  { name: 'Account 1', credentialId: 'CREDENTIAL_ID_1' },\n  { name: 'Account 2', credentialId: 'CREDENTIAL_ID_2' },\n  { name: 'Account 3', credentialId: 'CREDENTIAL_ID_3' },\n  { name: 'Account 4', credentialId: 'CREDENTIAL_ID_4' },\n  { name: 'Account 5', credentialId: 'CREDENTIAL_ID_5' },\n  { name: 'Account 6', credentialId: 'CREDENTIAL_ID_6' },\n  { name: 'Account 7', credentialId: 'CREDENTIAL_ID_7' }\n];\n\n// Watermark configuration\nconst watermarkUrl = 'https://i.ibb.co/tPNLcysY/Fun-Able-Profile-Logo-5.png';\n\nreturn accounts.map(account => ({\n  json: {\n    accountName: account.name,\n    credentialId: account.credentialId,\n    watermarkUrl: watermarkUrl\n  }\n}));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "loop-accounts-1",
+      "name": "Loop Over Accounts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [-200, 0],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "get-channel-id-1",
+      "name": "Get Channel ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [0, 0],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels",
+        "method": "GET",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\"part\": \"id,snippet\", \"mine\": \"true\"}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "={{ $json.credentialId }}",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "extract-channel-info-1",
+      "name": "Extract Channel Info",
+      "type": "n8n-nodes-base.set",
+      "position": [200, 0],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "channel-id",
+              "name": "channelId",
+              "type": "string",
+              "value": "={{ $json.items[0].id }}"
+            },
+            {
+              "id": "channel-name",
+              "name": "channelName",
+              "type": "string",
+              "value": "={{ $json.items[0].snippet.title }}"
+            },
+            {
+              "id": "watermark-url",
+              "name": "watermarkUrl",
+              "type": "string",
+              "value": "={{ $('Loop Over Accounts').item.json.watermarkUrl }}"
+            },
+            {
+              "id": "credential-id",
+              "name": "credentialId",
+              "type": "string",
+              "value": "={{ $('Loop Over Accounts').item.json.credentialId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "download-watermark-1",
+      "name": "Download Watermark",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [400, 0],
+      "parameters": {
+        "url": "={{ $json.watermarkUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "initiate-upload-1",
+      "name": "Initiate Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [600, -80],
+      "parameters": {
+        "url": "=https://www.googleapis.com/upload/youtube/v3/watermarks/set?uploadType=resumable&channelId={{ $('Extract Channel Info').item.json.channelId }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Upload-Content-Type",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"timing\": {\"type\": \"offsetFromStart\", \"offsetMs\": 0}, \"position\": {\"type\": \"corner\", \"cornerPosition\": \"topRight\"}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "={{ $('Extract Channel Info').item.json.credentialId }}",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "keep-binary-1",
+      "name": "Keep Binary",
+      "type": "n8n-nodes-base.noOp",
+      "position": [600, 80],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "merge-1",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [800, 0],
+      "parameters": {
+        "mode": "mergeByPosition",
+        "options": {}
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "upload-image-1",
+      "name": "Upload Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1000, 0],
+      "parameters": {
+        "url": "={{ $('Initiate Upload').item.json.headers.location }}",
+        "method": "PUT",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "={{ $('Extract Channel Info').item.json.credentialId }}",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "log-result-1",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.set",
+      "position": [1200, 0],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "type": "string",
+              "value": "={{ $json.statusCode === 200 || $json.statusCode === 204 ? 'SUCCESS' : 'FAILED' }}"
+            },
+            {
+              "id": "channel-name-log",
+              "name": "channelName",
+              "type": "string",
+              "value": "={{ $('Extract Channel Info').item.json.channelName }}"
+            },
+            {
+              "id": "channel-id-log",
+              "name": "channelId",
+              "type": "string",
+              "value": "={{ $('Extract Channel Info').item.json.channelId }}"
+            },
+            {
+              "id": "response-code",
+              "name": "responseCode",
+              "type": "number",
+              "value": "={{ $json.statusCode }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "wait-between-accounts",
+      "name": "Wait 3 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "position": [1400, 0],
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "typeVersion": 1.1,
+      "webhookId": "wait-webhook-id-multi"
+    },
+    {
+      "id": "sticky-instructions",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-880, -280],
+      "parameters": {
+        "width": 640,
+        "height": 600,
+        "content": "## YouTube Watermark Updater - Multi-Account Version\n\n**Update watermarks for up to 7 YouTube accounts in one run.**\n\n### Setup Steps\n\n1. **Add YouTube OAuth2 Credentials for Each Account**\n   - Go to: Credentials → Add → YouTube OAuth2 API\n   - Do this for each YouTube account (up to 7)\n   - Note each credential's ID (visible in URL or credential settings)\n\n2. **Configure Account List**\n   - Edit the \"Setup Accounts\" Code node\n   - Replace `CREDENTIAL_ID_1`, `CREDENTIAL_ID_2`, etc. with your actual credential IDs\n   - Update account names if desired\n   - Change `watermarkUrl` if using a different image\n\n3. **Run the Workflow**\n   - Click \"Execute Workflow\"\n   - The workflow will process each account sequentially\n   - Check the \"Log Result\" output for success/failure status\n\n### How It Works\n\n1. Setup Accounts: Creates list of 7 accounts with credential IDs\n2. Loop Over Accounts: Processes each account one by one\n3. For each account:\n   - Get channel ID and name\n   - Download watermark image\n   - Initiate resumable upload\n   - Upload binary image data\n   - Log result (success/failure)\n   - Wait 3 seconds before next account (rate limiting)\n\n### Finding Credential IDs\n\n1. Go to n8n Credentials page\n2. Click on a YouTube OAuth2 API credential\n3. Look at the URL: `...credentials/[CREDENTIAL_ID]`\n4. Copy that ID to the Setup Accounts node\n\n### Important Notes\n\n- Watermark may take 5-10 minutes to appear in YouTube Studio\n- Verify in: YouTube Studio → Customization → Branding\n- Each account uses ~51 quota units\n- Total for 7 accounts: ~357 quota units (well under daily 10,000 limit)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Setup Accounts", "type": "main", "index": 0}]]
+    },
+    "Setup Accounts": {
+      "main": [[{"node": "Loop Over Accounts", "type": "main", "index": 0}]]
+    },
+    "Loop Over Accounts": {
+      "main": [[{"node": "Get Channel ID", "type": "main", "index": 0}]]
+    },
+    "Get Channel ID": {
+      "main": [[{"node": "Extract Channel Info", "type": "main", "index": 0}]]
+    },
+    "Extract Channel Info": {
+      "main": [[{"node": "Download Watermark", "type": "main", "index": 0}]]
+    },
+    "Download Watermark": {
+      "main": [[
+        {"node": "Initiate Upload", "type": "main", "index": 0},
+        {"node": "Keep Binary", "type": "main", "index": 0}
+      ]]
+    },
+    "Initiate Upload": {
+      "main": [[{"node": "Merge", "type": "main", "index": 0}]]
+    },
+    "Keep Binary": {
+      "main": [[{"node": "Merge", "type": "main", "index": 1}]]
+    },
+    "Merge": {
+      "main": [[{"node": "Upload Image", "type": "main", "index": 0}]]
+    },
+    "Upload Image": {
+      "main": [[{"node": "Log Result", "type": "main", "index": 0}]]
+    },
+    "Log Result": {
+      "main": [[{"node": "Wait 3 Seconds", "type": "main", "index": 0}]]
+    },
+    "Wait 3 Seconds": {
+      "main": [[{"node": "Loop Over Accounts", "type": "main", "index": 0}]]
+    }
+  }
+}

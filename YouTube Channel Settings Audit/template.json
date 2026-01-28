@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "instanceId": "youtube-channel-audit-v1"
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger-audit",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [-800, 0],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "get-channel-details",
+      "name": "Get Channel Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-600, 0],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels",
+        "method": "GET",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,brandingSettings,contentDetails,statistics,status,topicDetails"
+            },
+            {
+              "name": "mine",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "get-recent-videos",
+      "name": "Get Recent Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-400, 0],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "method": "GET",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "forMine",
+              "value": "true"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "order",
+              "value": "date"
+            },
+            {
+              "name": "maxResults",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "get-video-details",
+      "name": "Get Video Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-200, 0],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "method": "GET",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails,statistics"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Get Recent Videos').item.json.items.map(v => v.id.videoId).join(',') }}"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "YouTube Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "audit-analysis",
+      "name": "Audit Analysis",
+      "type": "n8n-nodes-base.code",
+      "position": [0, 0],
+      "parameters": {
+        "jsCode": "const channel = $('Get Channel Details').item.json.items[0];\nconst videos = $('Get Video Details').item.json.items || [];\n\nconst audit = {\n  channelId: channel.id,\n  channelName: channel.snippet.title,\n  channelUrl: `https://youtube.com/channel/${channel.id}`,\n  auditDate: new Date().toISOString(),\n  \n  // Branding Audit\n  branding: {\n    profileImage: {\n      exists: !!channel.snippet.thumbnails?.default?.url,\n      url: channel.snippet.thumbnails?.default?.url,\n      status: channel.snippet.thumbnails?.default?.url ? '✅ Set' : '❌ Missing',\n      recommendation: channel.snippet.thumbnails?.default?.url ? 'Ensure it\\'s high quality (800x800px recommended)' : 'Upload a profile picture immediately - critical for brand recognition'\n    },\n    banner: {\n      exists: !!channel.brandingSettings?.image?.bannerExternalUrl,\n      url: channel.brandingSettings?.image?.bannerExternalUrl,\n      status: channel.brandingSettings?.image?.bannerExternalUrl ? '✅ Set' : '❌ Missing',\n      recommendation: channel.brandingSettings?.image?.bannerExternalUrl ? 'Verify it displays correctly on all devices (2560x1440px recommended)' : 'Upload a channel banner - highly recommended for professional appearance'\n    },\n    watermark: {\n      exists: !!channel.brandingSettings?.image?.watermarkImageUrl,\n      url: channel.brandingSettings?.image?.watermarkImageUrl,\n      status: channel.brandingSettings?.image?.watermarkImageUrl ? '✅ Set' : '⚠️ Missing',\n      recommendation: channel.brandingSettings?.image?.watermarkImageUrl ? 'Good - helps with channel branding' : 'Set a watermark to increase channel recognition and subscriptions'\n    }\n  },\n  \n  // Channel Info Audit\n  channelInfo: {\n    description: {\n      exists: !!channel.snippet.description,\n      length: (channel.snippet.description || '').length,\n      text: channel.snippet.description || '',\n      status: (channel.snippet.description || '').length > 100 ? '✅ Good' : (channel.snippet.description || '').length > 0 ? '⚠️ Too Short' : '❌ Missing',\n      recommendation: (channel.snippet.description || '').length > 100 ? 'Consider adding keywords and social links' : 'Write a detailed channel description (200-1000 chars) with keywords and links'\n    },\n    customUrl: {\n      exists: !!channel.snippet.customUrl,\n      url: channel.snippet.customUrl,\n      status: channel.snippet.customUrl ? '✅ Set' : '⚠️ Not Set',\n      recommendation: channel.snippet.customUrl ? 'Good - custom URL is set' : 'Eligible for custom URL after 100 subs and 30 days old'\n    },\n    country: {\n      exists: !!channel.snippet.country,\n      code: channel.snippet.country,\n      status: channel.snippet.country ? '✅ Set' : '⚠️ Not Set',\n      recommendation: channel.snippet.country ? 'Good - helps with regional targeting' : 'Set your country for better regional recommendations'\n    },\n    defaultLanguage: {\n      exists: !!channel.snippet.defaultLanguage,\n      code: channel.snippet.defaultLanguage,\n      status: channel.snippet.defaultLanguage ? '✅ Set' : '⚠️ Not Set',\n      recommendation: channel.snippet.defaultLanguage ? 'Ensure it matches your primary content language' : 'Set default language to help YouTube recommend to right audience'\n    }\n  },\n  \n  // Channel Settings Audit\n  settings: {\n    keywords: {\n      exists: !!channel.brandingSettings?.channel?.keywords,\n      count: (channel.brandingSettings?.channel?.keywords || '').split(',').filter(k => k.trim()).length,\n      keywords: channel.brandingSettings?.channel?.keywords || '',\n      status: (channel.brandingSettings?.channel?.keywords || '').split(',').filter(k => k.trim()).length >= 5 ? '✅ Good' : (channel.brandingSettings?.channel?.keywords || '').length > 0 ? '⚠️ Add More' : '❌ Missing',\n      recommendation: (channel.brandingSettings?.channel?.keywords || '').split(',').filter(k => k.trim()).length >= 5 ? 'Good - consider updating based on content evolution' : 'Add 10-20 relevant keywords to help with discovery'\n    },\n    trackingAnalyticsAccountId: {\n      exists: !!channel.brandingSettings?.channel?.trackingAnalyticsAccountId,\n      status: channel.brandingSettings?.channel?.trackingAnalyticsAccountId ? '✅ Set' : '⚠️ Not Set',\n      recommendation: 'Consider linking Google Analytics for advanced insights'\n    },\n    unsubscribedTrailer: {\n      exists: !!channel.brandingSettings?.channel?.unsubscribedTrailer,\n      videoId: channel.brandingSettings?.channel?.unsubscribedTrailer,\n      status: channel.brandingSettings?.channel?.unsubscribedTrailer ? '✅ Set' : '⚠️ Not Set',\n      recommendation: channel.brandingSettings?.channel?.unsubscribedTrailer ? 'Good - channel trailer is set for new visitors' : 'Create a channel trailer to convert visitors to subscribers'\n    },\n    featuredChannels: {\n      exists: !!channel.brandingSettings?.channel?.featuredChannelsUrls,\n      count: (channel.brandingSettings?.channel?.featuredChannelsUrls || []).length,\n      status: (channel.brandingSettings?.channel?.featuredChannelsUrls || []).length > 0 ? '✅ Set' : '⚠️ Not Set',\n      recommendation: 'Feature related channels to build community and get featured back'\n    }\n  },\n  \n  // Video Content Audit\n  recentVideos: {\n    totalAnalyzed: videos.length,\n    avgTitleLength: videos.reduce((sum, v) => sum + (v.snippet?.title || '').length, 0) / videos.length || 0,\n    avgDescriptionLength: videos.reduce((sum, v) => sum + (v.snippet?.description || '').length, 0) / videos.length || 0,\n    avgTagCount: videos.reduce((sum, v) => sum + (v.snippet?.tags || []).length, 0) / videos.length || 0,\n    videosWithoutTags: videos.filter(v => !(v.snippet?.tags || []).length).length,\n    videosWithShortDescription: videos.filter(v => (v.snippet?.description || '').length < 100).length,\n    videosWithoutThumbnail: videos.filter(v => v.snippet?.thumbnails?.default?.url?.includes('default')).length,\n    \n    titleStatus: function() {\n      const avg = this.avgTitleLength;\n      if (avg >= 40 && avg <= 70) return '✅ Good (40-70 chars)';\n      if (avg < 40) return '⚠️ Too Short';\n      return '⚠️ Too Long';\n    }(),\n    \n    descriptionStatus: function() {\n      const avg = this.avgDescriptionLength;\n      if (avg >= 200) return '✅ Good (200+ chars)';\n      if (avg >= 100) return '⚠️ Could be longer';\n      return '❌ Too Short';\n    }(),\n    \n    tagsStatus: function() {\n      const avg = this.avgTagCount;\n      if (avg >= 5) return '✅ Good (5+ tags)';\n      if (avg >= 3) return '⚠️ Add more tags';\n      return '❌ Insufficient tags';\n    }(),\n    \n    recommendations: [\n      videos.filter(v => (v.snippet?.title || '').length < 40).length > 0 ? `${videos.filter(v => (v.snippet?.title || '').length < 40).length} videos have short titles (< 40 chars)` : null,\n      videos.filter(v => (v.snippet?.description || '').length < 100).length > 0 ? `${videos.filter(v => (v.snippet?.description || '').length < 100).length} videos have short descriptions (< 100 chars)` : null,\n      videos.filter(v => !(v.snippet?.tags || []).length).length > 0 ? `${videos.filter(v => !(v.snippet?.tags || []).length).length} videos have no tags` : null,\n    ].filter(r => r)\n  },\n  \n  // Overall Score\n  score: {\n    branding: 0,\n    channelInfo: 0,\n    settings: 0,\n    content: 0,\n    total: 0\n  }\n};\n\n// Calculate scores\naudit.score.branding = [\n  audit.branding.profileImage.exists ? 30 : 0,\n  audit.branding.banner.exists ? 25 : 0,\n  audit.branding.watermark.exists ? 10 : 0\n].reduce((a, b) => a + b, 0);\n\naudit.score.channelInfo = [\n  audit.channelInfo.description.length > 100 ? 20 : audit.channelInfo.description.length > 0 ? 10 : 0,\n  audit.channelInfo.customUrl.exists ? 10 : 0,\n  audit.channelInfo.country.exists ? 5 : 0,\n  audit.channelInfo.defaultLanguage.exists ? 5 : 0\n].reduce((a, b) => a + b, 0);\n\naudit.score.settings = [\n  audit.settings.keywords.count >= 5 ? 15 : audit.settings.keywords.count > 0 ? 7 : 0,\n  audit.settings.unsubscribedTrailer.exists ? 10 : 0,\n  audit.settings.featuredChannels.count > 0 ? 5 : 0\n].reduce((a, b) => a + b, 0);\n\naudit.score.content = [\n  audit.recentVideos.avgTitleLength >= 40 && audit.recentVideos.avgTitleLength <= 70 ? 10 : 5,\n  audit.recentVideos.avgDescriptionLength >= 200 ? 10 : audit.recentVideos.avgDescriptionLength >= 100 ? 5 : 0,\n  audit.recentVideos.avgTagCount >= 5 ? 10 : audit.recentVideos.avgTagCount >= 3 ? 5 : 0\n].reduce((a, b) => a + b, 0);\n\naudit.score.total = audit.score.branding + audit.score.channelInfo + audit.score.settings + audit.score.content;\n\n// Priority Actions (top 5 most important)\naudit.priorityActions = [];\n\nif (!audit.branding.profileImage.exists) {\n  audit.priorityActions.push({ priority: 'CRITICAL', action: 'Upload profile picture', impact: 'High - Essential for brand recognition' });\n}\nif (!audit.branding.banner.exists) {\n  audit.priorityActions.push({ priority: 'HIGH', action: 'Upload channel banner', impact: 'High - Professional appearance' });\n}\nif (audit.channelInfo.description.length < 100) {\n  audit.priorityActions.push({ priority: 'HIGH', action: 'Write detailed channel description', impact: 'High - SEO and user understanding' });\n}\nif (audit.settings.keywords.count < 5) {\n  audit.priorityActions.push({ priority: 'HIGH', action: 'Add channel keywords (10-20)', impact: 'High - Discovery and SEO' });\n}\nif (!audit.settings.unsubscribedTrailer.exists) {\n  audit.priorityActions.push({ priority: 'MEDIUM', action: 'Create channel trailer', impact: 'Medium - Convert visitors to subscribers' });\n}\nif (!audit.branding.watermark.exists) {\n  audit.priorityActions.push({ priority: 'MEDIUM', action: 'Add channel watermark', impact: 'Medium - Branding and subscriptions' });\n}\nif (audit.recentVideos.videosWithoutTags > 0) {\n  audit.priorityActions.push({ priority: 'MEDIUM', action: `Add tags to ${audit.recentVideos.videosWithoutTags} videos`, impact: 'Medium - Video discovery' });\n}\n\nreturn [{ json: audit }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "format-report",
+      "name": "Format Report",
+      "type": "n8n-nodes-base.code",
+      "position": [200, 0],
+      "parameters": {
+        "jsCode": "const audit = $input.item.json;\n\nconst report = `\n╔═══════════════════════════════════════════════════════════════════╗\n║           YOUTUBE CHANNEL SETTINGS AUDIT REPORT                  ║\n╚═══════════════════════════════════════════════════════════════════╝\n\nChannel: ${audit.channelName}\nChannel ID: ${audit.channelId}\nAudit Date: ${new Date(audit.auditDate).toLocaleString()}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 OVERALL SCORE: ${audit.score.total}/100\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  🎨 Branding:      ${audit.score.branding}/65\n  ℹ️  Channel Info:  ${audit.score.channelInfo}/40\n  ⚙️  Settings:      ${audit.score.settings}/30\n  🎬 Content:       ${audit.score.content}/30\n\n${audit.score.total >= 80 ? '✅ Excellent! Your channel is well-optimized.' : audit.score.total >= 60 ? '⚠️  Good, but there\\'s room for improvement.' : '❌ Critical issues found - immediate action needed.'}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 PRIORITY ACTIONS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${audit.priorityActions.slice(0, 5).map((a, i) => `${i + 1}. [${a.priority}] ${a.action}\\n   Impact: ${a.impact}`).join('\\n\\n')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎨 BRANDING AUDIT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${audit.branding.profileImage.status} Profile Picture\n  ${audit.branding.profileImage.recommendation}\n\n${audit.branding.banner.status} Channel Banner\n  ${audit.branding.banner.recommendation}\n\n${audit.branding.watermark.status} Channel Watermark\n  ${audit.branding.watermark.recommendation}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nℹ️  CHANNEL INFO AUDIT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${audit.channelInfo.description.status} Channel Description (${audit.channelInfo.description.length} chars)\n  ${audit.channelInfo.description.recommendation}\n\n${audit.channelInfo.customUrl.status} Custom URL${audit.channelInfo.customUrl.url ? ': ' + audit.channelInfo.customUrl.url : ''}\n  ${audit.channelInfo.customUrl.recommendation}\n\n${audit.channelInfo.country.status} Country${audit.channelInfo.country.code ? ': ' + audit.channelInfo.country.code : ''}\n  ${audit.channelInfo.country.recommendation}\n\n${audit.channelInfo.defaultLanguage.status} Default Language${audit.channelInfo.defaultLanguage.code ? ': ' + audit.channelInfo.defaultLanguage.code : ''}\n  ${audit.channelInfo.defaultLanguage.recommendation}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚙️  SETTINGS AUDIT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${audit.settings.keywords.status} Channel Keywords (${audit.settings.keywords.count} keywords)\n  ${audit.settings.keywords.recommendation}\n  Current: ${audit.settings.keywords.keywords || 'None'}\n\n${audit.settings.unsubscribedTrailer.status} Channel Trailer\n  ${audit.settings.unsubscribedTrailer.recommendation}\n\n${audit.settings.featuredChannels.status} Featured Channels (${audit.settings.featuredChannels.count})\n  ${audit.settings.featuredChannels.recommendation}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎬 RECENT VIDEOS AUDIT (Last ${audit.recentVideos.totalAnalyzed} videos)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${audit.recentVideos.titleStatus} Title Length\n  Average: ${Math.round(audit.recentVideos.avgTitleLength)} characters\n  Optimal: 40-70 characters\n\n${audit.recentVideos.descriptionStatus} Description Length\n  Average: ${Math.round(audit.recentVideos.avgDescriptionLength)} characters\n  Optimal: 200+ characters\n\n${audit.recentVideos.tagsStatus} Tags\n  Average: ${Math.round(audit.recentVideos.avgTagCount)} tags per video\n  Optimal: 5-15 tags\n\n${audit.recentVideos.recommendations.length > 0 ? '⚠️  Issues Found:\\n  • ' + audit.recentVideos.recommendations.join('\\n  • ') : '✅ No major issues found'}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 NEXT STEPS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n1. Address priority actions in order\n2. Use the AI-Powered Channel Optimizer workflow to generate:\n   • Optimized channel description\n   • Better channel keywords\n   • Improved video tags and descriptions\n3. Re-run this audit after making changes\n\nChannel URL: ${audit.channelUrl}\nYouTube Studio: https://studio.youtube.com/channel/${audit.channelId}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;\n\nreturn [{ \n  json: {\n    report: report,\n    rawData: audit,\n    score: audit.score.total,\n    priorityActions: audit.priorityActions\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "sticky-instructions-audit",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-1080, -240],
+      "parameters": {
+        "width": 560,
+        "height": 480,
+        "content": "## YouTube Channel Settings Audit\n\n**Comprehensive check of your channel's optimization.**\n\n### What This Checks\n\n✅ **Branding (65 points)**\n- Profile picture\n- Channel banner\n- Watermark\n\n✅ **Channel Info (40 points)**\n- Description quality\n- Custom URL\n- Country & language settings\n\n✅ **Settings (30 points)**\n- Channel keywords\n- Channel trailer\n- Featured channels\n\n✅ **Recent Videos (30 points)**\n- Title optimization\n- Description quality\n- Tag usage\n\n### Setup\n\n1. Connect YouTube OAuth2 credentials to all 3 HTTP Request nodes\n2. Run workflow\n3. Check \"Format Report\" output for detailed analysis\n\n### Score Guide\n\n- **80-100**: Excellent optimization\n- **60-79**: Good, minor improvements\n- **40-59**: Needs work\n- **0-39**: Critical issues\n\n### Next Step\n\nUse the **AI-Powered Channel Optimizer** workflow to fix issues automatically."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Get Channel Details", "type": "main", "index": 0}]]
+    },
+    "Get Channel Details": {
+      "main": [[{"node": "Get Recent Videos", "type": "main", "index": 0}]]
+    },
+    "Get Recent Videos": {
+      "main": [[{"node": "Get Video Details", "type": "main", "index": 0}]]
+    },
+    "Get Video Details": {
+      "main": [[{"node": "Audit Analysis", "type": "main", "index": 0}]]
+    },
+    "Audit Analysis": {
+      "main": [[{"node": "Format Report", "type": "main", "index": 0}]]
+    }
+  }
+}

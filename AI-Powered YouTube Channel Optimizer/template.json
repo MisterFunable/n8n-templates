@@ -1,0 +1,347 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ac85d8b2-2333-4d1a-84e9-a98ecdb9ea0a",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        1840,
+        960
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,brandingSettings,statistics,contentDetails,topicDetails"
+            },
+            {
+              "name": "mine",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a7fbb0a6-d31e-4c7c-aede-a3c19fa4bc34",
+      "name": "Get Channel Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2064,
+        960
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "BKcJDTw1B9sRU5HT",
+          "name": "YouTube Account Statuenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "forMine",
+              "value": "true"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "order",
+              "value": "date"
+            },
+            {
+              "name": "maxResults",
+              "value": "15"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6563ed8c-47f9-411c-9601-3f64c25b0af5",
+      "name": "Get Recent Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2288,
+        960
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "BKcJDTw1B9sRU5HT",
+          "name": "YouTube Account Statuenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,statistics,contentDetails"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Get Recent Videos').item.json.items.map(v => v.id.videoId).join(',') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b4679b2-987b-43e9-a331-22f5d7c2a42d",
+      "name": "Get Video Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2512,
+        960
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "BKcJDTw1B9sRU5HT",
+          "name": "YouTube Account Statuenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const channel = $('Get Channel Data').item.json.items[0];\nconst videos = $('Get Video Stats').item.json.items || [];\n\n// Analyze video performance\nconst topVideos = videos\n  .filter(v => v.statistics?.viewCount)\n  .sort((a, b) => parseInt(b.statistics.viewCount) - parseInt(a.statistics.viewCount))\n  .slice(0, 5);\n\nconst avgViews = videos.reduce((sum, v) => sum + parseInt(v.statistics?.viewCount || 0), 0) / videos.length;\n\n// Extract common themes from titles\nconst allTitles = videos.map(v => v.snippet.title).join(' ');\nconst allDescriptions = videos.map(v => v.snippet.description).join(' ');\nconst allTags = videos.flatMap(v => v.snippet.tags || []);\nconst tagFrequency = allTags.reduce((acc, tag) => {\n  acc[tag] = (acc[tag] || 0) + 1;\n  return acc;\n}, {});\nconst commonTags = Object.entries(tagFrequency)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 20)\n  .map(([tag]) => tag);\n\n// Build context object\nconst context = {\n  channel: {\n    name: channel.snippet.title,\n    description: channel.snippet.description || '',\n    keywords: channel.brandingSettings?.channel?.keywords || '',\n    subscriberCount: parseInt(channel.statistics?.subscriberCount || 0),\n    videoCount: parseInt(channel.statistics?.videoCount || 0),\n    viewCount: parseInt(channel.statistics?.viewCount || 0),\n    country: channel.snippet.country || 'Not set',\n    defaultLanguage: channel.snippet.defaultLanguage || 'en'\n  },\n  videos: {\n    total: videos.length,\n    avgViews: Math.round(avgViews),\n    topPerformers: topVideos.map(v => ({\n      title: v.snippet.title,\n      views: parseInt(v.statistics.viewCount),\n      likes: parseInt(v.statistics.likeCount || 0),\n      comments: parseInt(v.statistics.commentCount || 0),\n      tags: v.snippet.tags || []\n    })),\n    commonTags: commonTags,\n    sampleTitles: videos.slice(0, 10).map(v => v.snippet.title),\n    avgTitleLength: Math.round(videos.reduce((sum, v) => sum + v.snippet.title.length, 0) / videos.length),\n    avgDescLength: Math.round(videos.reduce((sum, v) => sum + (v.snippet.description || '').length, 0) / videos.length)\n  }\n};\n\nreturn [{ json: context }];"
+      },
+      "id": "e4003794-fe3e-4421-89e0-9610180a1ddd",
+      "name": "Build AI Context",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2736,
+        960
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $input.item.json;\n\nconst prompt = `You are a YouTube optimization expert. Analyze this channel data and provide actionable recommendations.\n\n# CHANNEL INFORMATION\n\nChannel Name: ${context.channel.name}\nSubscribers: ${context.channel.subscriberCount.toLocaleString()}\nTotal Videos: ${context.channel.videoCount}\nTotal Views: ${context.channel.viewCount.toLocaleString()}\nCountry: ${context.channel.country}\nLanguage: ${context.channel.defaultLanguage}\n\n# CURRENT CHANNEL DESCRIPTION\n${context.channel.description || '(No description set)'}\n\n# CURRENT CHANNEL KEYWORDS\n${context.channel.keywords || '(No keywords set)'}\n\n# VIDEO PERFORMANCE DATA\n\nTotal Analyzed: ${context.videos.total} recent videos\nAverage Views: ${context.videos.avgViews.toLocaleString()}\nAverage Title Length: ${context.videos.avgTitleLength} characters\nAverage Description Length: ${context.videos.avgDescLength} characters\n\n## Top Performing Videos\n${context.videos.topPerformers.map((v, i) => `${i + 1}. \"${v.title}\"\n   Views: ${v.views.toLocaleString()} | Likes: ${v.likes.toLocaleString()} | Comments: ${v.comments.toLocaleString()}\n   Tags: ${v.tags.slice(0, 5).join(', ')}`).join('\\n\\n')}\n\n## Most Common Tags Across Videos\n${context.videos.commonTags.slice(0, 15).join(', ')}\n\n## Sample Recent Video Titles\n${context.videos.sampleTitles.map((t, i) => `${i + 1}. ${t}`).join('\\n')}\n\n# YOUR TASK\n\nProvide optimization recommendations in the following JSON format:\n\n{\n  \"channelDescription\": {\n    \"optimized\": \"Write an SEO-optimized channel description (200-1000 chars) that clearly explains what the channel is about, includes keywords, and has a call-to-action. Include line breaks for readability.\",\n    \"reasoning\": \"Explain why this description is better\"\n  },\n  \"channelKeywords\": {\n    \"optimized\": \"keyword1, keyword2, keyword3, keyword4, keyword5, keyword6, keyword7, keyword8, keyword9, keyword10\",\n    \"reasoning\": \"Explain why these keywords were chosen based on content analysis\"\n  },\n  \"videoTitleTemplate\": {\n    \"template\": \"[Hook/Number] + [Main Topic] + [Benefit/Result] (40-70 chars)\",\n    \"examples\": [\n      \"Example title 1 following the template\",\n      \"Example title 2 following the template\",\n      \"Example title 3 following the template\"\n    ],\n    \"reasoning\": \"Explain the strategy\"\n  },\n  \"videoDescriptionTemplate\": {\n    \"template\": \"A template structure for video descriptions with placeholders like [VIDEO_TOPIC], [KEY_POINTS], etc.\",\n    \"example\": \"Full example description using the template\",\n    \"reasoning\": \"Why this structure works\"\n  },\n  \"recommendedTags\": {\n    \"coreTags\": [\"5-7 core tags that should be in EVERY video\"],\n    \"categoryTags\": {\n      \"Category 1\": [\"tags for this type of content\"],\n      \"Category 2\": [\"tags for this type of content\"]\n    },\n    \"reasoning\": \"Tag strategy explanation\"\n  },\n  \"contentStrategy\": {\n    \"strengths\": [\"What's working well based on top performers\"],\n    \"opportunities\": [\"Content gaps and opportunities\"],\n    \"thumbnailTips\": [\"3-5 specific thumbnail best practices for this channel\"],\n    \"uploadSchedule\": \"Recommended posting frequency and timing\"\n  },\n  \"quickWins\": [\n    \"Immediate action 1 with expected impact\",\n    \"Immediate action 2 with expected impact\",\n    \"Immediate action 3 with expected impact\"\n  ]\n}\n\n# IMPORTANT GUIDELINES\n\n1. Base ALL recommendations on the actual data provided\n2. Keywords should be highly relevant to the content shown in top performers\n3. Description must include the channel's actual focus area\n4. Tags should mix broad and specific terms\n5. Keep language natural and engaging\n6. Include social proof if subscriber count is notable\n7. Match the tone to the channel's content type\n8. For non-English channels, provide content in the channel's language: ${context.channel.defaultLanguage}\n\nProvide ONLY the JSON response, no other text.`;\n\nreturn [{ json: { prompt: prompt, context: context } }];"
+      },
+      "id": "9642cd19-d0e0-4849-b693-6fcfe4612f9d",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2960,
+        960
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You are a YouTube optimization expert. Provide detailed, actionable recommendations based on channel data analysis."
+        }
+      },
+      "id": "b462f3a3-c8f9-472f-8e2f-90bcebf8c104",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        3184,
+        960
+      ],
+      "typeVersion": 1.7
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse =  $input.item.json;\nconst context = $('Build AI Prompt').item.json.context;\n\ntry {\n  // AI Agent returns output in different format\n  let responseText = '';\n  \n  // Check if response is from AI Agent (has output field)\n  if (aiResponse.output) {\n    responseText = aiResponse.output;\n  } else if (aiResponse.text) {\n    responseText = aiResponse.text;\n  } else {\n    responseText = JSON.stringify(aiResponse);\n  }\n  \n  // Remove markdown code blocks if present\n  const jsonText = responseText\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  \n  const recommendations = JSON.parse(jsonText);\n  \n  return [{\n    json: {\n      channelName: context.channel.name,\n      channelId: $('Get Channel Data').item.json.items[0].id,\n      generatedAt: new Date().toISOString(),\n      recommendations: recommendations,\n      currentSettings: {\n        description: context.channel.description,\n        keywords: context.channel.keywords\n      },\n      aiResponseRaw: responseText\n    }\n  }];\n  \n} catch (error) {\n  return [{\n    json: {\n      error: 'Failed to parse AI response',\n      errorDetails: error.message,\n      rawResponse: aiResponse,\n      channelName: context.channel.name\n    }\n  }];\n}"
+      },
+      "id": "8d50689e-bd7e-4668-9b3c-724f379cccf3",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3536,
+        960
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\n\nif (data.error) {\n  return [{\n    json: {\n      report: `ERROR: ${data.error}\\n\\nDetails: ${data.errorDetails}\\n\\nPlease check the AI response and try again.`,\n      hasError: true\n    }\n  }];\n}\n\nconst rec = data.recommendations;\n\nconst report = `\n╔═══════════════════════════════════════════════════════════════════╗\n║        AI-POWERED YOUTUBE CHANNEL OPTIMIZATION REPORT            ║\n╚═══════════════════════════════════════════════════════════════════╝\n\nChannel: ${data.channelName}\nGenerated: ${new Date(data.generatedAt).toLocaleString()}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚀 QUICK WINS - Do These First!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${rec.quickWins.map((w, i) => `${i + 1}. ${w}`).join('\\n\\n')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 OPTIMIZED CHANNEL DESCRIPTION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${rec.channelDescription.optimized}\n\n💡 Why this works:\n${rec.channelDescription.reasoning}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔑 OPTIMIZED CHANNEL KEYWORDS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${rec.channelKeywords.optimized}\n\n💡 Why these keywords:\n${rec.channelKeywords.reasoning}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎬 VIDEO TITLE TEMPLATE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nTemplate: ${rec.videoTitleTemplate.template}\n\nExamples:\n${rec.videoTitleTemplate.examples.map((e, i) => `  ${i + 1}. ${e}`).join('\\n')}\n\n💡 Strategy:\n${rec.videoTitleTemplate.reasoning}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📄 VIDEO DESCRIPTION TEMPLATE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nTemplate Structure:\n${rec.videoDescriptionTemplate.template}\n\nExample:\n${rec.videoDescriptionTemplate.example}\n\n💡 Why this works:\n${rec.videoDescriptionTemplate.reasoning}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏷️  RECOMMENDED TAGS STRATEGY\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCore Tags (use in EVERY video):\n${rec.recommendedTags.coreTags.map(t => `  • ${t}`).join('\\n')}\n\nCategory-Specific Tags:\n${Object.entries(rec.recommendedTags.categoryTags).map(([cat, tags]) => `\n  ${cat}:\n${tags.map(t => `    • ${t}`).join('\\n')}`).join('\\n')}\n\n💡 Tag Strategy:\n${rec.recommendedTags.reasoning}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 CONTENT STRATEGY INSIGHTS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✅ Your Strengths:\n${rec.contentStrategy.strengths.map(s => `  • ${s}`).join('\\n')}\n\n🎯 Growth Opportunities:\n${rec.contentStrategy.opportunities.map(o => `  • ${o}`).join('\\n')}\n\n🖼️  Thumbnail Best Practices:\n${rec.contentStrategy.thumbnailTips.map(t => `  • ${t}`).join('\\n')}\n\n📅 Recommended Upload Schedule:\n  ${rec.contentStrategy.uploadSchedule}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 HOW TO APPLY THESE CHANGES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n1. Go to YouTube Studio: https://studio.youtube.com/channel/${data.channelId}\n\n2. Update Channel Description:\n   Settings → Channel → Basic info → Description\n   Copy the optimized description above\n\n3. Update Channel Keywords:\n   Settings → Channel → Basic info → Keywords\n   Copy the optimized keywords above\n\n4. For Future Videos:\n   • Use the title template when creating new videos\n   • Use the description template\n   • Add core tags + relevant category tags\n\n5. Update Existing Videos:\n   • Start with your top 10 most viewed videos\n   • Update titles (carefully - can affect rankings)\n   • Improve descriptions using template\n   • Add recommended tags\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔄 NEXT STEPS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n1. ✅ Implement quick wins immediately\n2. 📝 Update channel description and keywords\n3. 🎬 Apply templates to next 3 videos and monitor performance\n4. 📊 Run the Settings Audit workflow again in 30 days\n5. 🔄 Re-run this AI optimization quarterly as content evolves\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;\n\nreturn [{\n  json: {\n    report: report,\n    recommendations: rec,\n    channelId: data.channelId,\n    channelName: data.channelName\n  }\n}];"
+      },
+      "id": "8e232433-88a2-4e38-a295-f02621685103",
+      "name": "Format Recommendations",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3760,
+        960
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "content": "## AI-Powered YouTube Channel Optimizer V2\n\n**Uses n8n AI Agent with Google Gemini to analyze your channel and generate optimized content.**\n\n### What This Generates\n\n🤖 **AI analyzes your channel and creates:**\n\n1. **Optimized Channel Description**\n   - SEO-friendly\n   - Clear value proposition\n   - Includes keywords\n\n2. **Strategic Channel Keywords**\n   - Based on your top content\n   - Mix of broad/specific terms\n   - 10-20 keywords\n\n3. **Video Title Template**\n   - Proven structure\n   - Examples for your niche\n   - 40-70 character sweet spot\n\n4. **Video Description Template**\n   - Reusable structure\n   - SEO optimized\n   - Full example included\n\n5. **Tag Strategy**\n   - Core tags for all videos\n   - Category-specific tags\n   - Based on top performers\n\n6. **Content Strategy Insights**\n   - What's working\n   - Growth opportunities\n   - Thumbnail tips\n   - Upload schedule\n\n7. **Quick Wins**\n   - Top 3 immediate actions\n   - Expected impact\n\n### Setup\n\n1. **Add YouTube OAuth2 Credentials**\n   - Connect to all 3 YouTube API nodes\n   - Same credential for all\n\n2. **Add Google Gemini Credentials**\n   - Click \"Google Gemini Chat Model\" node\n   - Add Google Gemini OAuth2 API credential\n   - Get API key: https://makersuite.google.com/app/apikey\n\n3. **Run Workflow**\n   - Takes 30-60 seconds\n   - AI Agent analyzes last 15 videos\n   - Check \"Format Recommendations\" output\n\n### What's New in V2\n\n✨ Uses n8n AI Agent (no manual API setup)\n✨ Built-in credential management\n✨ Easier to switch AI models\n✨ Better error handling\n✨ More maintainable\n\n### Requirements\n\n- YouTube OAuth2 API credentials\n- Google Gemini API credential (free tier available)\n- At least 5-10 videos on channel for best results\n\n### Cost\n\n- Gemini API: Free tier includes 60 requests/minute\n- This workflow = 1 request (~$0.00 on free tier)\n\n### Tips\n\n- Run after uploading 5+ new videos\n- Re-run quarterly as content evolves\n- Use with Settings Audit workflow for complete optimization",
+        "height": 700,
+        "width": 640
+      },
+      "id": "de56d546-79a0-4bdf-a4dd-4916821a0691",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1104,
+        592
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        3184,
+        1168
+      ],
+      "id": "7400be69-e168-4622-b6a1-97d637da551e",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "sX24OB0zXQG36TOo",
+          "name": "OpenAi account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Channel Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Channel Data": {
+      "main": [
+        [
+          {
+            "node": "Get Recent Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Videos": {
+      "main": [
+        [
+          {
+            "node": "Get Video Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Stats": {
+      "main": [
+        [
+          {
+            "node": "Build AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Context": {
+      "main": [
+        [
+          {
+            "node": "Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Format Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

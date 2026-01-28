@@ -1,0 +1,284 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "050fc938-4554-4d55-8f85-07d1cdb321f7",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        13072,
+        4864
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"part\": \"id\",\n  \"mine\": \"true\"\n}",
+        "options": {}
+      },
+      "id": "616179e2-596d-42f1-80e0-56915414782f",
+      "name": "Get My Channel ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        13296,
+        4864
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "pUBXAvMPWo0DlxB2",
+          "name": "YouTube Account Mechenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "watermark-url",
+              "name": "watermarkUrl",
+              "type": "string",
+              "value": "https://i.ibb.co/tPNLcysY/Fun-Able-Profile-Logo-5.png"
+            },
+            {
+              "id": "channel-id",
+              "name": "channelId",
+              "type": "string",
+              "value": "={{ $json.items[0].id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1e092a92-ef92-4960-beb4-25bcbd57f9fa",
+      "name": "Set Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        13520,
+        4864
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.watermarkUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "2b4316b6-597a-47f2-8145-5ef117983d60",
+      "name": "Download Watermark",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        13744,
+        4864
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/upload/youtube/v3/watermarks/set?uploadType=resumable&channelId={{ $('Set Configuration').item.json.channelId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Upload-Content-Type",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"timing\": {\n    \"type\": \"offsetFromStart\",\n    \"offsetMs\": 0\n  },\n  \"position\": {\n    \"type\": \"corner\",\n    \"cornerPosition\": \"topRight\"\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "50c01b7b-cfee-4035-b422-120ab0c3788a",
+      "name": "Initiate Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        13968,
+        4768
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "pUBXAvMPWo0DlxB2",
+          "name": "YouTube Account Mechenable"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "53d6c019-37a0-47db-ba50-ece3a42c7b11",
+      "name": "Keep Binary",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        13968,
+        4960
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "2f170741-81ac-4b9a-8d90-47def8a896a4",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        14192,
+        4864
+      ],
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Initiate Upload').item.json.headers.location }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "ebe1d89a-3a1e-46ac-be2a-2cd4c1400f75",
+      "name": "Upload Image Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        14416,
+        4864
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "pUBXAvMPWo0DlxB2",
+          "name": "YouTube Account Mechenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## YouTube Watermark Updater\n\n**Workflow to set your YouTube channel watermark.**\n\n### Setup Steps\n\n1. **Add YouTube OAuth2 Credentials**\n   - Go to: Credentials → Add → YouTube OAuth2 API\n   - Enter your Google Cloud Client ID & Secret\n   - Connect credentials in all 3 HTTP Request nodes\n\n2. **Optional: Change Watermark**\n   - Edit \"Set Configuration\" node\n   - Update `watermarkUrl` to your image URL\n\n3. **Run the Workflow**\n   - Click \"Execute Workflow\"\n   - Success = HTTP 200/204 from final node\n\n### How It Works\n\n**Resumable Upload (YouTube API requirement):**\n1. Get channel ID\n2. Download image (binary data)\n3. Split flow:\n   - Branch A: Initiate upload → get upload URL\n   - Branch B: Keep binary data\n4. Merge: Combine upload URL + binary data\n5. Upload binary to the upload URL\n\n**Why split/merge?**\nThe \"Initiate Upload\" returns JSON (upload URL) but loses binary data. We preserve binary via NoOp branch, then merge both for final upload.\n\n### Image Requirements\n- Max 10MB, PNG/JPEG\n- Min 150x150px\n- Transparent PNG recommended",
+        "height": 968,
+        "width": 608
+      },
+      "id": "6e216fdd-3b73-41ee-a3ae-53b66ec028bf",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        12272,
+        4432
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get My Channel ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get My Channel ID": {
+      "main": [
+        [
+          {
+            "node": "Set Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Configuration": {
+      "main": [
+        [
+          {
+            "node": "Download Watermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Watermark": {
+      "main": [
+        [
+          {
+            "node": "Initiate Upload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Keep Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initiate Upload": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Binary": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Upload Image Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}
