@@ -1,0 +1,108 @@
+{
+  "tableName": "Instagram Account Metrics",
+  "backend": "n8n",
+  "description": "Track Instagram account metrics and performance over time",
+  "fields": [
+    {
+      "name": "accountId",
+      "type": "string",
+      "description": "Instagram Business/Creator Account ID",
+      "required": true
+    },
+    {
+      "name": "username",
+      "type": "string",
+      "description": "Instagram username/handle",
+      "required": true
+    },
+    {
+      "name": "followersCount",
+      "type": "number",
+      "description": "Total number of followers"
+    },
+    {
+      "name": "followingCount",
+      "type": "number",
+      "description": "Total number of accounts being followed"
+    },
+    {
+      "name": "mediaCount",
+      "type": "number",
+      "description": "Total number of media posts"
+    },
+    {
+      "name": "impressions",
+      "type": "number",
+      "description": "Total impressions in tracking period"
+    },
+    {
+      "name": "reach",
+      "type": "number",
+      "description": "Total reach in tracking period"
+    },
+    {
+      "name": "profileViews",
+      "type": "number",
+      "description": "Profile views in tracking period"
+    },
+    {
+      "name": "websiteClicks",
+      "type": "number",
+      "description": "Website link clicks in tracking period"
+    },
+    {
+      "name": "engagementRate",
+      "type": "number",
+      "description": "Calculated engagement rate percentage",
+      "options": {
+        "precision": 2
+      }
+    },
+    {
+      "name": "accountType",
+      "type": "string",
+      "description": "Type of Instagram account (BUSINESS, CREATOR, PERSONAL)"
+    },
+    {
+      "name": "verified",
+      "type": "boolean",
+      "description": "Whether the account has a verified badge"
+    },
+    {
+      "name": "biography",
+      "type": "string",
+      "description": "Account biography/description text"
+    },
+    {
+      "name": "website",
+      "type": "string",
+      "description": "Website URL from profile"
+    },
+    {
+      "name": "profilePicUrl",
+      "type": "string",
+      "description": "Profile picture URL"
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "description": "Business category (if applicable)"
+    },
+    {
+      "name": "lastChecked",
+      "type": "dateTime",
+      "description": "Timestamp of last data collection",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Tracking status: active, paused, error"
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "description": "Additional notes or observations"
+    }
+  ]
+}

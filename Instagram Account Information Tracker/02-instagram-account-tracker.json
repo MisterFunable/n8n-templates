@@ -1,0 +1,600 @@
+{
+  "name": "Instagram Account Information Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-backend",
+              "name": "backend",
+              "value": "n8n",
+              "type": "string"
+            },
+            {
+              "id": "config-datatable-id",
+              "name": "dataTableId",
+              "value": "YOUR_DATA_TABLE_ID",
+              "type": "string"
+            },
+            {
+              "id": "config-airtable-base",
+              "name": "airtableBaseId",
+              "value": "YOUR_AIRTABLE_BASE_ID",
+              "type": "string"
+            },
+            {
+              "id": "config-airtable-table",
+              "name": "airtableTableName",
+              "value": "Instagram Account Metrics",
+              "type": "string"
+            },
+            {
+              "id": "config-insights-period",
+              "name": "insightsPeriod",
+              "value": "day",
+              "type": "string"
+            },
+            {
+              "id": "config-insights-days",
+              "name": "insightsDays",
+              "value": 7,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "config-node-001",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        460
+      ],
+      "notes": "Configure:\n- backend: 'n8n' or 'airtable'\n- dataTableId: n8n Data Table ID (if using n8n)\n- airtableBaseId & airtableTableName: Airtable details (if using Airtable)\n- insightsPeriod: 'day' for daily insights\n- insightsDays: Number of days to fetch insights for"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.instagram.com/me",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"fields\": \"id,username,account_type,media_count,followers_count,follows_count,biography,website,profile_picture_url\"\n}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "fetch-account-001",
+      "name": "Fetch Account Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        460
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "instagram-bearer-token",
+          "name": "Instagram Bearer Token"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.instagram.com/{{ $('Fetch Account Info').item.json.id }}/insights",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"metric\": \"impressions,reach,profile_views,website_clicks\",\n  \"period\": \"{{ $('Configuration').item.json.insightsPeriod }}\",\n  \"since\": \"{{ $now.minus({ days: $('Configuration').item.json.insightsDays }).toUnixInteger() }}\",\n  \"until\": \"{{ $now.toUnixInteger() }}\"\n}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-insights-001",
+      "name": "Fetch Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        460
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "instagram-bearer-token",
+          "name": "Instagram Bearer Token"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process Instagram data and calculate metrics\nconst accountInfo = $('Fetch Account Info').item.json;\nconst insightsData = $('Fetch Insights').item.json;\n\n// Extract insights values\nlet impressions = 0;\nlet reach = 0;\nlet profileViews = 0;\nlet websiteClicks = 0;\n\nif (insightsData && insightsData.data) {\n  insightsData.data.forEach(metric => {\n    const latestValue = metric.values && metric.values.length > 0 \n      ? metric.values[metric.values.length - 1].value \n      : 0;\n    \n    switch(metric.name) {\n      case 'impressions':\n        impressions = latestValue;\n        break;\n      case 'reach':\n        reach = latestValue;\n        break;\n      case 'profile_views':\n        profileViews = latestValue;\n        break;\n      case 'website_clicks':\n        websiteClicks = latestValue;\n        break;\n    }\n  });\n}\n\n// Calculate engagement rate\n// Engagement Rate = (Reach / Followers) * 100\nconst followersCount = accountInfo.followers_count || 0;\nconst engagementRate = followersCount > 0 \n  ? ((reach / followersCount) * 100).toFixed(2) \n  : 0;\n\n// Build processed data object\nconst processedData = {\n  accountId: accountInfo.id,\n  username: accountInfo.username,\n  followersCount: accountInfo.followers_count || 0,\n  followingCount: accountInfo.follows_count || 0,\n  mediaCount: accountInfo.media_count || 0,\n  impressions: impressions,\n  reach: reach,\n  profileViews: profileViews,\n  websiteClicks: websiteClicks,\n  engagementRate: parseFloat(engagementRate),\n  accountType: accountInfo.account_type || 'PERSONAL',\n  verified: accountInfo.is_verified || false,\n  biography: accountInfo.biography || '',\n  website: accountInfo.website || '',\n  profilePicUrl: accountInfo.profile_picture_url || '',\n  category: accountInfo.category || '',\n  lastChecked: new Date().toISOString(),\n  status: 'active',\n  notes: ''\n};\n\nreturn { json: processedData };"
+      },
+      "id": "process-data-001",
+      "name": "Process & Calculate Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "backend-check-n8n",
+              "leftValue": "={{ $('Configuration').item.json.backend }}",
+              "rightValue": "n8n",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "route-backend-001",
+      "name": "Route by Backend",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.dataTableId }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "accountId",
+              "keyValue": "={{ $json.accountId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-exists-n8n-001",
+      "name": "Check if Exists (n8n)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        340
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "exists-check",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-exists-n8n-001",
+      "name": "If Exists (n8n)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.dataTableId }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $('Process & Calculate Metrics').item.json }}",
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "insert-n8n-001",
+      "name": "Insert Row (n8n)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.dataTableId }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "accountId",
+              "keyValue": "={{ $('Process & Calculate Metrics').item.json.accountId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $('Process & Calculate Metrics').item.json }}",
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "update-n8n-001",
+      "name": "Update Row (n8n)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Configuration').item.json.airtableTableName }}"
+        },
+        "filterByFormula": "={accountId} = '{{ $json.accountId }}'",
+        "options": {}
+      },
+      "id": "check-exists-at-001",
+      "name": "Check if Exists (Airtable)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        580
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-token",
+          "name": "Airtable Token"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "exists-check-at",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-exists-at-001",
+      "name": "If Exists (Airtable)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Configuration').item.json.airtableTableName }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $('Process & Calculate Metrics').item.json }}",
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "insert-at-001",
+      "name": "Insert Record (Airtable)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        480
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-token",
+          "name": "Airtable Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Configuration').item.json.airtableTableName }}"
+        },
+        "id": "={{ $('Check if Exists (Airtable)').item.json.id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $('Process & Calculate Metrics').item.json }}",
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "update-at-001",
+      "name": "Update Record (Airtable)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        680
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-token",
+          "name": "Airtable Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        20,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Instagram Account Information Tracker\n\nAutomatically fetch and store Instagram account metrics.\n\n### Features:\n- Fetches account info (followers, following, media count)\n- Fetches insights (impressions, reach, profile views, website clicks)\n- Calculates engagement rate\n- Stores in n8n Data Tables or Airtable\n- Handles updates for existing accounts\n\n### Setup:\n1. Configure backend (n8n or Airtable) in Configuration node\n2. Set Data Table ID or Airtable Base/Table name\n3. Add Instagram Bearer Token credential\n4. Adjust schedule trigger as needed (default: every 6 hours)\n\n### Prerequisites:\n- Instagram Business or Creator account\n- Facebook Developer App with Instagram Basic Display API\n- Bearer token with required permissions\n- Table created using schema from 01-table-schema-maker.json\n\n### Metrics Tracked:\n- Account ID, Username\n- Followers, Following, Media Count\n- Impressions, Reach, Profile Views\n- Website Clicks, Engagement Rate\n- Account Type, Biography, Website\n- Profile Picture URL, Last Checked, Status",
+        "height": 596.2631138545953,
+        "width": 422.1363901777092,
+        "color": 5
+      },
+      "id": "sticky-note-001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Account Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Account Info": {
+      "main": [
+        [
+          {
+            "node": "Fetch Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Insights": {
+      "main": [
+        [
+          {
+            "node": "Process & Calculate Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process & Calculate Metrics": {
+      "main": [
+        [
+          {
+            "node": "Route by Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Backend": {
+      "main": [
+        [
+          {
+            "node": "Check if Exists (n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check if Exists (Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Exists (n8n)": {
+      "main": [
+        [
+          {
+            "node": "If Exists (n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Exists (n8n)": {
+      "main": [
+        [
+          {
+            "node": "Update Row (n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Row (n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Exists (Airtable)": {
+      "main": [
+        [
+          {
+            "node": "If Exists (Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Exists (Airtable)": {
+      "main": [
+        [
+          {
+            "node": "Update Record (Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Record (Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-23T00:00:00.000Z",
+  "versionId": "1"
+}

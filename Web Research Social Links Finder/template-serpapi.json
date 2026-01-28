@@ -1,0 +1,245 @@
+{
+  "name": "Web Research - Social Links Finder (SerpAPI + Gemini)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [-1400, 0],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"searchQueries\": [\n    \"BJD doll manufacturers official website\",\n    \"reborn doll artists shop\",\n    \"custom ball jointed doll makers\"\n  ],\n  \"maxResultsPerQuery\": 5,\n  \"serpApiKey\": \"YOUR_SERPAPI_KEY_HERE\",\n  \"geminiApiKey\": \"YOUR_GEMINI_API_KEY_HERE\"\n}\n",
+        "options": {}
+      },
+      "id": "config-node",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [-1180, 0],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "searchQueries",
+        "options": {}
+      },
+      "id": "split-queries",
+      "name": "Split Search Queries",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [-960, 0],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $('Configuration').first().json.serpApiKey }}"
+            },
+            {
+              "name": "engine",
+              "value": "google"
+            },
+            {
+              "name": "q",
+              "value": "={{ $json.searchQueries }}"
+            },
+            {
+              "name": "num",
+              "value": "={{ $('Configuration').first().json.maxResultsPerQuery }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "serpapi-search",
+      "name": "SerpAPI Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-740, 0],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "organic_results",
+        "options": {}
+      },
+      "id": "split-results",
+      "name": "Split Search Results",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [-520, 0],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $json.link }}"
+            },
+            {
+              "id": "title",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "id": "snippet",
+              "name": "snippet",
+              "type": "string",
+              "value": "={{ $json.snippet }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-urls",
+      "name": "Extract URLs",
+      "type": "n8n-nodes-base.set",
+      "position": [-300, 0],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "fetch-page",
+      "name": "Fetch Page Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-80, 0],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data || '';\nconst url = $input.first().json.url || '';\nconst title = $input.first().json.title || '';\nconst geminiApiKey = $('Configuration').first().json.geminiApiKey;\n\nconst socialPatterns = {\n  instagram: /https?:\\/\\/(www\\.)?instagram\\.com\\/[\\w._-]+/gi,\n  facebook: /https?:\\/\\/(www\\.)?facebook\\.com\\/[\\w._-]+/gi,\n  twitter: /https?:\\/\\/(www\\.)?(twitter|x)\\.com\\/[\\w._-]+/gi,\n  youtube: /https?:\\/\\/(www\\.)?youtube\\.com\\/(channel|c|user|@)[\\w._-]*/gi,\n  tiktok: /https?:\\/\\/(www\\.)?tiktok\\.com\\/@[\\w._-]+/gi,\n  pinterest: /https?:\\/\\/(www\\.)?pinterest\\.com\\/[\\w._-]+/gi,\n  linkedin: /https?:\\/\\/(www\\.)?linkedin\\.com\\/(company|in)\\/[\\w._-]+/gi,\n  etsy: /https?:\\/\\/(www\\.)?etsy\\.com\\/shop\\/[\\w._-]+/gi\n};\n\nconst foundLinks = {};\nfor (const [platform, pattern] of Object.entries(socialPatterns)) {\n  const matches = html.match(pattern) || [];\n  foundLinks[platform] = [...new Set(matches.map(m => m.toLowerCase()))];\n}\n\nconst emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/gi;\nconst emails = [...new Set((html.match(emailPattern) || []).filter(e => \n  !e.includes('example') && !e.includes('email@') && !e.includes('sentry') && !e.includes('.png') && !e.includes('.jpg')\n))];\n\nlet cleanText = html\n  .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 5000);\n\nreturn {\n  sourceUrl: url,\n  sourceTitle: title,\n  foundLinks,\n  emails,\n  pageText: cleanText,\n  geminiApiKey\n};"
+      },
+      "id": "extract-links-code",
+      "name": "Extract Social Links",
+      "type": "n8n-nodes-base.code",
+      "position": [140, 0],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $json.geminiApiKey }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Extract social media and contact info from this page.\\n\\nURL: {{ $json.sourceUrl }}\\nTitle: {{ $json.sourceTitle }}\\n\\nLinks already found by regex:\\n{{ JSON.stringify($json.foundLinks) }}\\n\\nEmails found:\\n{{ JSON.stringify($json.emails) }}\\n\\nPage text:\\n{{ $json.pageText.replace(/\\\"/g, '\\\\\\\"').replace(/\\n/g, ' ').substring(0, 4000) }}\\n\\nRespond with ONLY valid JSON (no markdown code blocks):\\n{\\\"company\\\":\\\"name\\\",\\\"social\\\":{\\\"instagram\\\":[],\\\"facebook\\\":[],\\\"twitter\\\":[],\\\"youtube\\\":[],\\\"tiktok\\\":[],\\\"linkedin\\\":[],\\\"other\\\":[]},\\\"emails\\\":[],\\\"description\\\":\\\"brief description\\\"}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"maxOutputTokens\": 1024\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "gemini-api",
+      "name": "Gemini - Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [360, 0],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst sourceUrl = $('Extract Social Links').first().json.sourceUrl;\nconst sourceTitle = $('Extract Social Links').first().json.sourceTitle;\nconst foundLinks = $('Extract Social Links').first().json.foundLinks;\nconst foundEmails = $('Extract Social Links').first().json.emails;\n\ntry {\n  const geminiText = input.candidates?.[0]?.content?.parts?.[0]?.text || '';\n  \n  let parsed = {};\n  const jsonMatch = geminiText.match(/```json\\n?([\\s\\S]*?)\\n?```/) || \n                    geminiText.match(/\\{[\\s\\S]*\\}/);\n  \n  if (jsonMatch) {\n    const jsonStr = jsonMatch[1] || jsonMatch[0];\n    parsed = JSON.parse(jsonStr);\n  }\n  \n  const mergedSocial = {};\n  const platforms = ['instagram', 'facebook', 'twitter', 'youtube', 'tiktok', 'linkedin', 'pinterest', 'etsy', 'other'];\n  \n  for (const platform of platforms) {\n    const regexLinks = foundLinks[platform] || [];\n    const aiLinks = parsed.social?.[platform] || [];\n    mergedSocial[platform] = [...new Set([...regexLinks, ...aiLinks])];\n  }\n  \n  const mergedEmails = [...new Set([...foundEmails, ...(parsed.emails || [])])];\n  \n  return {\n    url: sourceUrl,\n    title: sourceTitle,\n    company: parsed.company || 'Unknown',\n    description: parsed.description || '',\n    social: mergedSocial,\n    emails: mergedEmails,\n    success: true\n  };\n} catch (e) {\n  return {\n    url: sourceUrl,\n    title: sourceTitle,\n    company: 'Unknown',\n    description: '',\n    social: foundLinks,\n    emails: foundEmails,\n    success: false,\n    error: e.message\n  };\n}"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "position": [580, 0],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "aggregateItems",
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate All",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [800, 0],
+      "typeVersion": 3.1
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data || [];\n\nconst allSocial = {\n  instagram: new Set(),\n  facebook: new Set(),\n  twitter: new Set(),\n  youtube: new Set(),\n  tiktok: new Set(),\n  linkedin: new Set(),\n  pinterest: new Set(),\n  etsy: new Set(),\n  other: new Set()\n};\nconst allEmails = new Set();\nconst companies = [];\n\nfor (const item of data) {\n  companies.push({\n    name: item.company || 'Unknown',\n    url: item.url,\n    title: item.title,\n    description: item.description || '',\n    success: item.success\n  });\n  \n  for (const [platform, links] of Object.entries(item.social || {})) {\n    if (allSocial[platform] && Array.isArray(links)) {\n      links.forEach(l => {\n        if (l && typeof l === 'string') allSocial[platform].add(l);\n      });\n    }\n  }\n  \n  if (Array.isArray(item.emails)) {\n    item.emails.forEach(e => {\n      if (e && typeof e === 'string') allEmails.add(e);\n    });\n  }\n}\n\nconst socialLinks = {};\nfor (const [platform, linkSet] of Object.entries(allSocial)) {\n  socialLinks[platform] = [...linkSet];\n}\n\nreturn {\n  summary: {\n    totalProcessed: data.length,\n    successfulAI: data.filter(d => d.success).length,\n    failedAI: data.filter(d => !d.success).length\n  },\n  companies,\n  socialLinks,\n  allEmails: [...allEmails],\n  rawData: data\n};"
+      },
+      "id": "create-summary",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.code",
+      "position": [1020, 0],
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Configuration", "type": "main", "index": 0}]]
+    },
+    "Configuration": {
+      "main": [[{"node": "Split Search Queries", "type": "main", "index": 0}]]
+    },
+    "Split Search Queries": {
+      "main": [[{"node": "SerpAPI Search", "type": "main", "index": 0}]]
+    },
+    "SerpAPI Search": {
+      "main": [[{"node": "Split Search Results", "type": "main", "index": 0}]]
+    },
+    "Split Search Results": {
+      "main": [[{"node": "Extract URLs", "type": "main", "index": 0}]]
+    },
+    "Extract URLs": {
+      "main": [[{"node": "Fetch Page Content", "type": "main", "index": 0}]]
+    },
+    "Fetch Page Content": {
+      "main": [[{"node": "Extract Social Links", "type": "main", "index": 0}]]
+    },
+    "Extract Social Links": {
+      "main": [[{"node": "Gemini - Analyze", "type": "main", "index": 0}]]
+    },
+    "Gemini - Analyze": {
+      "main": [[{"node": "Parse Response", "type": "main", "index": 0}]]
+    },
+    "Parse Response": {
+      "main": [[{"node": "Aggregate All", "type": "main", "index": 0}]]
+    },
+    "Aggregate All": {
+      "main": [[{"node": "Create Summary", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

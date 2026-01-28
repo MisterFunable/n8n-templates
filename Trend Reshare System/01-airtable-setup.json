@@ -1,0 +1,206 @@
+{
+  "meta": {
+    "instanceId": "trend-reshare-airtable-setup",
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [0, 0],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "schema-docs",
+      "name": "Schema Documentation",
+      "type": "n8n-nodes-base.set",
+      "position": [224, 0],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "message",
+              "name": "message",
+              "type": "string",
+              "value": "This workflow documents the Airtable schema. Please create the tables manually in Airtable following the schema below."
+            },
+            {
+              "id": "baseUrl",
+              "name": "airtableBaseUrl",
+              "type": "string",
+              "value": "https://airtable.com/create"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "videos-schema",
+      "name": "Videos Table Schema",
+      "type": "n8n-nodes-base.set",
+      "position": [448, -128],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "table",
+              "name": "tableName",
+              "type": "string",
+              "value": "Videos"
+            },
+            {
+              "id": "fields",
+              "name": "fields",
+              "type": "string",
+              "value": "videoId (Single line text - Primary), title (Single line text), description (Long text), tags (Single line text), publishedAt (Date), thumbnailUrl (URL), viewCount (Number), duration (Single line text), lastSharedAt (Date), shareCount (Number - Default: 0), searchableText (Long text)"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "trends-schema",
+      "name": "Trends Table Schema",
+      "type": "n8n-nodes-base.set",
+      "position": [448, 0],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "table",
+              "name": "tableName",
+              "type": "string",
+              "value": "Trends"
+            },
+            {
+              "id": "fields",
+              "name": "fields",
+              "type": "string",
+              "value": "trendId (Single line text - Primary), keyword (Single line text), source (Single select: google/reddit/twitter), category (Single select: dolls/figures/lego/boardgames/general), detectedAt (Date), trafficVolume (Single line text), relatedQueries (Long text), processed (Checkbox), matchedVideoId (Link to Videos)"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "posts-schema",
+      "name": "Posts Table Schema",
+      "type": "n8n-nodes-base.set",
+      "position": [448, 128],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "table",
+              "name": "tableName",
+              "type": "string",
+              "value": "Posts"
+            },
+            {
+              "id": "fields",
+              "name": "fields",
+              "type": "string",
+              "value": "postId (Single line text - Primary), videoId (Link to Videos), trendId (Link to Trends), postText (Long text), postedAt (Date), likes (Number - Default: 0), retweets (Number - Default: 0)"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "sticky-instructions",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-400, -256],
+      "parameters": {
+        "width": 680,
+        "height": 560,
+        "content": "## Airtable Schema Setup\n\nThis workflow documents the required Airtable schema for the Trend Reshare System.\n\n### Setup Instructions\n\n1. Go to https://airtable.com and create a new base called **Trend Reshare System**\n\n2. Create **3 tables** with the field configurations shown in the output nodes:\n   - **Videos** - Stores your YouTube channel videos\n   - **Trends** - Stores detected trends from Google\n   - **Posts** - Records X posts made by the system\n\n3. For **Single select** fields, add these options:\n   - **source**: google, reddit, twitter\n   - **category**: dolls, figures, lego, boardgames, general\n\n4. For **Link** fields:\n   - **matchedVideoId** links to Videos table\n   - **videoId** (in Posts) links to Videos table\n   - **trendId** (in Posts) links to Trends table\n\n5. Set **default values**:\n   - shareCount: 0\n   - likes: 0\n   - retweets: 0\n\n### After Setup\n\n1. Copy your **Base ID** from the Airtable URL (starts with 'app')\n2. Generate an **API Key** at https://airtable.com/account\n3. Add these to n8n credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "sticky-videos",
+      "name": "Sticky Note - Videos",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [416, -256],
+      "parameters": {
+        "color": 6,
+        "width": 360,
+        "height": 180,
+        "content": "## Videos Table\nStores YouTube channel video metadata for matching against trends."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "sticky-trends",
+      "name": "Sticky Note - Trends",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [416, -48],
+      "parameters": {
+        "color": 7,
+        "width": 360,
+        "height": 160,
+        "content": "## Trends Table\nStores detected trends from Google Trends RSS feed."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "sticky-posts",
+      "name": "Sticky Note - Posts",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [416, 96],
+      "parameters": {
+        "color": 3,
+        "width": 360,
+        "height": 160,
+        "content": "## Posts Table\nRecords all X posts made by the system for tracking and analytics."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Schema Documentation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schema Documentation": {
+      "main": [
+        [
+          {
+            "node": "Videos Table Schema",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trends Table Schema",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Posts Table Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

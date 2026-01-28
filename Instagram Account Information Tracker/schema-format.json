@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Table Schema Format",
+  "description": "JSON schema for defining tables that can be created in either n8n Data Tables or Airtable",
+  "type": "object",
+  "properties": {
+    "tableName": {
+      "type": "string",
+      "description": "Name of the table to create"
+    },
+    "backend": {
+      "type": "string",
+      "enum": ["n8n", "airtable"],
+      "description": "Which backend to use: n8n Data Tables or Airtable"
+    },
+    "airtableConfig": {
+      "type": "object",
+      "description": "Required only if backend is 'airtable'",
+      "properties": {
+        "baseId": {
+          "type": "string",
+          "description": "Airtable Base ID"
+        }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "description": "Array of field definitions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name (must be unique)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "dateTime",
+              "array",
+              "object",
+              "singleSelect",
+              "multipleSelect",
+              "url",
+              "email",
+              "phone",
+              "rating",
+              "duration",
+              "percent",
+              "currency",
+              "count",
+              "rollup",
+              "lookup",
+              "formula",
+              "createdTime",
+              "lastModifiedTime",
+              "createdBy",
+              "lastModifiedBy",
+              "autonumber",
+              "barcode",
+              "button"
+            ],
+            "description": "Field data type"
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description/notes"
+          },
+          "required": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this field is required"
+          },
+          "options": {
+            "type": "object",
+            "description": "Type-specific options",
+            "properties": {
+              "choices": {
+                "type": "array",
+                "description": "For singleSelect/multipleSelect: array of choice values",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "precision": {
+                "type": "integer",
+                "description": "For number/currency: decimal precision (0-8)"
+              },
+              "symbol": {
+                "type": "string",
+                "description": "For currency: currency symbol ($, €, £, etc.)"
+              },
+              "format": {
+                "type": "string",
+                "description": "For dateTime: date format string"
+              },
+              "max": {
+                "type": "integer",
+                "description": "For rating: maximum rating value"
+              },
+              "icon": {
+                "type": "string",
+                "description": "For rating: icon to use (star, heart, etc.)"
+              },
+              "color": {
+                "type": "string",
+                "description": "For rating: color theme"
+              },
+              "durationFormat": {
+                "type": "string",
+                "enum": ["h:mm", "h:mm:ss", "h:mm:ss.s"],
+                "description": "For duration: display format"
+              },
+              "formula": {
+                "type": "string",
+                "description": "For formula fields: the formula expression"
+              },
+              "linkedTable": {
+                "type": "string",
+                "description": "For rollup/lookup: name of linked table"
+              },
+              "linkedField": {
+                "type": "string",
+                "description": "For rollup/lookup: field name in linked table"
+              },
+              "aggregation": {
+                "type": "string",
+                "enum": ["count", "sum", "avg", "max", "min"],
+                "description": "For rollup: aggregation function"
+              }
+            }
+          }
+        },
+        "required": ["name", "type"]
+      }
+    }
+  },
+  "required": ["tableName", "backend", "fields"],
+  "examples": [
+    {
+      "tableName": "Instagram Account Metrics",
+      "backend": "n8n",
+      "fields": [
+        {
+          "name": "accountId",
+          "type": "string",
+          "description": "Instagram account ID",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "description": "Instagram username",
+          "required": true
+        },
+        {
+          "name": "followersCount",
+          "type": "number",
+          "description": "Number of followers"
+        },
+        {
+          "name": "followingCount",
+          "type": "number",
+          "description": "Number of accounts following"
+        },
+        {
+          "name": "mediaCount",
+          "type": "number",
+          "description": "Total number of media posts"
+        },
+        {
+          "name": "engagementRate",
+          "type": "percent",
+          "description": "Engagement rate percentage",
+          "options": {
+            "precision": 2
+          }
+        },
+        {
+          "name": "accountType",
+          "type": "singleSelect",
+          "description": "Type of Instagram account",
+          "options": {
+            "choices": ["BUSINESS", "CREATOR", "PERSONAL"]
+          }
+        },
+        {
+          "name": "verified",
+          "type": "boolean",
+          "description": "Whether account is verified"
+        },
+        {
+          "name": "biography",
+          "type": "string",
+          "description": "Account biography/description"
+        },
+        {
+          "name": "website",
+          "type": "url",
+          "description": "Website URL from profile"
+        },
+        {
+          "name": "profilePicUrl",
+          "type": "url",
+          "description": "Profile picture URL"
+        },
+        {
+          "name": "lastUpdated",
+          "type": "dateTime",
+          "description": "Last time data was updated",
+          "options": {
+            "format": "YYYY-MM-DD HH:mm:ss"
+          }
+        },
+        {
+          "name": "status",
+          "type": "singleSelect",
+          "description": "Account tracking status",
+          "options": {
+            "choices": ["active", "paused", "error"]
+          }
+        }
+      ]
+    }
+  ]
+}

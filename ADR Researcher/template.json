@@ -1,0 +1,201 @@
+{
+  "name": "ADR Researcher - Engineering Documentation Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📋 ADR Researcher - Engineering Documentation Assistant\n\n### Purpose\nInteractive AI assistant for DevOps, CloudOps, and Development research. Creates ADRs, procedures, and technical documentation with source citations.\n\n### Setup\n1. **Required Credentials:**\n   - OpenAI API (or Anthropic/other LLM)\n   - SerpAPI Key (for web search)\n\n2. **Configuration:**\n   - Set your preferred LLM model in the AI Agent\n   - Configure output format (markdown, json, adr)\n   - Adjust memory window size for context length\n\n3. **Usage:**\n   - Use Chat Trigger webhook URL\n   - Ask questions like:\n     - \"How do I create a Terraform module for AWS S3?\"\n     - \"What's the procedure for setting up Prometheus alerting?\"\n     - \"ADR: Should we use Kubernetes or ECS?\"\n\n### Features\n- ✅ Web research with source tracking\n- ✅ Multi-format output (Markdown, ADR, JSON)\n- ✅ Handles version/platform clarifications\n- ✅ Conversation memory for iterations\n- ✅ Structured ADR generation",
+        "height": 580,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-instructions",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-900, -300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🔧 Configuration\nSet API keys and preferences",
+        "height": 160,
+        "width": 200,
+        "color": 5
+      },
+      "id": "sticky-config",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-460, -80],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI Agent\nResearch + reasoning",
+        "height": 320,
+        "width": 340,
+        "color": 6
+      },
+      "id": "sticky-agent",
+      "name": "Sticky Note - Agent",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-40, -80],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📝 Output\nFormat and return",
+        "height": 320,
+        "width": 260,
+        "color": 3
+      },
+      "id": "sticky-output",
+      "name": "Sticky Note - Output",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [340, -80],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "public": true,
+        "mode": "webhook",
+        "options": {}
+      },
+      "id": "chat-trigger",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [-640, 100],
+      "webhookId": "adr-researcher-chat",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"outputFormat\": \"markdown\",\n  \"memoryWindowSize\": 10,\n  \"maxSearchResults\": 5,\n  \"serpApiKey\": \"YOUR_SERPAPI_KEY\",\n  \"includeSourceUrls\": true,\n  \"adrTemplate\": \"madr\"\n}",
+        "options": {}
+      },
+      "id": "config-node",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [-420, 100],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an expert Engineering Documentation Researcher specializing in DevOps, CloudOps, and Software Development. Your role is to help create ADRs (Architecture Decision Records), procedures, runbooks, and technical documentation.\n\n## Your Capabilities\n- Research technical topics using web search\n- Create structured ADRs following MADR or custom templates\n- Write step-by-step procedures and runbooks\n- Handle complexity around versions, permissions, and platforms\n- Ask clarifying questions when scope is unclear\n\n## Important Guidelines\n\n### 1. Always Clarify Scope\nBefore researching, identify and ask about:\n- **Version specifics**: Which version of the tool/platform?\n- **Platform context**: Cloud (AWS/GCP/Azure) vs Self-hosted/On-prem?\n- **Permission level**: Admin, user, or specific IAM roles?\n- **Environment**: Production, staging, development?\n- **Existing infrastructure**: What's already in place?\n\n### 2. Research Approach\n- Search for official documentation first\n- Look for version-specific guides\n- Find community best practices and gotchas\n- Check for security considerations\n- Note any deprecated features or breaking changes\n\n### 3. Output Structure\nFor **ADRs**, use this format:\n```markdown\n# ADR-[NUMBER]: [Title]\n\n## Status\n[Proposed | Accepted | Deprecated | Superseded]\n\n## Context\n[What is the issue or decision that needs to be made?]\n\n## Decision Drivers\n- [Driver 1]\n- [Driver 2]\n\n## Considered Options\n1. [Option 1]\n2. [Option 2]\n3. [Option 3]\n\n## Decision Outcome\n[Which option was chosen and why]\n\n### Consequences\n**Good:**\n- [Benefit 1]\n\n**Bad:**\n- [Drawback 1]\n\n## Sources\n- [URL 1] - [Description]\n- [URL 2] - [Description]\n```\n\nFor **Procedures/Runbooks**, use:\n```markdown\n# [Title]\n\n## Prerequisites\n- [Prerequisite 1]\n- [Prerequisite 2]\n\n## Scope\n- **Platform**: [Platform details]\n- **Version**: [Version info]\n- **Permissions Required**: [Permissions]\n\n## Steps\n\n### Step 1: [Title]\n[Description]\n```code\n[command or code]\n```\n\n### Step 2: [Title]\n...\n\n## Verification\n[How to verify success]\n\n## Rollback\n[How to undo if needed]\n\n## Troubleshooting\n| Issue | Cause | Solution |\n|-------|-------|----------|\n\n## Sources\n- [URL] - [Description]\n```\n\n### 4. Source Citation\nALWAYS cite your sources. For each piece of information:\n- Include the URL\n- Note the date accessed (current date)\n- Mention if information might be outdated\n\n### 5. Handling Uncertainty\n- If official docs conflict with community practices, note both\n- Flag information that might be version-specific\n- Indicate when you need more context to provide accurate guidance\n\n### 6. Iterative Approach\nAfter initial research, offer to:\n- Deep dive into specific sections\n- Provide alternative approaches\n- Add more detail to any step\n- Create related documentation (e.g., troubleshooting guide)",
+          "maxIterations": 10
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent - Researcher",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [0, 100],
+      "typeVersion": 1.7
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "openai-chat",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [-120, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "id": "window-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [0, 300],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "serp-tool",
+      "name": "SerpAPI Search",
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "position": [120, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "name": "fetch_documentation",
+        "description": "Fetch content from a documentation URL. Use this to get detailed information from official docs, GitHub repos, or technical blogs. Input should be a valid URL.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"url\": \"https://docs.example.com/guide\"\n}"
+      },
+      "id": "http-tool",
+      "name": "Tool - Fetch URL",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [240, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst config = $('Configuration').first().json;\nconst chatInput = $('Chat Trigger').first().json;\n\n// Extract the agent's response\nconst agentOutput = response.output || response.text || '';\n\n// Extract sources from the response if present\nconst sourceRegex = /https?:\\/\\/[^\\s\\)\\]]+/g;\nconst sources = [...new Set((agentOutput.match(sourceRegex) || []))];\n\n// Format based on configuration\nconst outputFormat = config.outputFormat || 'markdown';\nconst includeSourceUrls = config.includeSourceUrls !== false;\n\nlet formattedOutput = {\n  response: agentOutput,\n  format: outputFormat,\n  sources: includeSourceUrls ? sources : [],\n  metadata: {\n    timestamp: new Date().toISOString(),\n    sessionId: chatInput.sessionId || 'default',\n    query: chatInput.chatInput || chatInput.text || ''\n  }\n};\n\n// If JSON format requested, structure the content\nif (outputFormat === 'json') {\n  // Try to extract structured data from ADR format\n  const adrMatch = agentOutput.match(/# ADR-\\d+: (.+)/i);\n  const statusMatch = agentOutput.match(/## Status\\s*\\n(.+)/i);\n  const contextMatch = agentOutput.match(/## Context\\s*\\n([\\s\\S]*?)(?=##|$)/i);\n  const decisionMatch = agentOutput.match(/## Decision Outcome\\s*\\n([\\s\\S]*?)(?=###|##|$)/i);\n  \n  if (adrMatch) {\n    formattedOutput.structuredADR = {\n      title: adrMatch[1]?.trim() || '',\n      status: statusMatch?.[1]?.trim() || 'Proposed',\n      context: contextMatch?.[1]?.trim() || '',\n      decision: decisionMatch?.[1]?.trim() || '',\n      sources: sources\n    };\n  }\n}\n\nreturn formattedOutput;"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "position": [380, 100],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.response }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Chat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [560, 100],
+      "typeVersion": 1.1
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [[{"node": "Configuration", "type": "main", "index": 0}]]
+    },
+    "Configuration": {
+      "main": [[{"node": "AI Agent - Researcher", "type": "main", "index": 0}]]
+    },
+    "AI Agent - Researcher": {
+      "main": [[{"node": "Format Output", "type": "main", "index": 0}]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{"node": "AI Agent - Researcher", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [[{"node": "AI Agent - Researcher", "type": "ai_memory", "index": 0}]]
+    },
+    "SerpAPI Search": {
+      "ai_tool": [[{"node": "AI Agent - Researcher", "type": "ai_tool", "index": 0}]]
+    },
+    "Tool - Fetch URL": {
+      "ai_tool": [[{"node": "AI Agent - Researcher", "type": "ai_tool", "index": 0}]]
+    },
+    "Format Output": {
+      "main": [[{"node": "Respond to Chat", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

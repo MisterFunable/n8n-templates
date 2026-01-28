@@ -1,0 +1,655 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "7aeacf38-ff53-4fc0-afa3-8d3a22b80424",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        3472,
+        784
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {},
+      "id": "2caf058c-afa2-4328-a528-d5939877af91",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        3472,
+        944
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "channelId",
+              "name": "youtubeChannelId",
+              "type": "string",
+              "value": "UCEH0sxRdQsy-y6-I-7V0pvw"
+            },
+            {
+              "id": "maxResults",
+              "name": "maxResults",
+              "type": "number",
+              "value": 50
+            },
+            {
+              "id": "airtableBaseId",
+              "name": "airtableBaseId",
+              "type": "string",
+              "value": "YOUR_BASE_ID"
+            },
+            {
+              "id": "videosTableName",
+              "name": "videosTableName",
+              "type": "string",
+              "value": "Videos"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36b8c483-455a-41fb-a9ef-0e815ddb0156",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        3696,
+        864
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "contentDetails"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.youtubeChannelId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5320d790-d9cf-44fb-90c9-6dc740f91cd2",
+      "name": "Get Channel Upload Playlist",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3920,
+        864
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "googleApi": {
+          "id": "V8xYoZ4uNm1skmJG",
+          "name": "Google Service Account account"
+        },
+        "httpBearerAuth": {
+          "id": "bn9nC9IWuz2MUYrh",
+          "name": "Bearer Auth Instagram Account Jueguenable"
+        },
+        "youTubeOAuth2Api": {
+          "id": "ikJucBJAO1JGW3ry",
+          "name": "YouTube Account Jueguenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "playlistId",
+              "name": "uploadsPlaylistId",
+              "type": "string",
+              "value": "={{ $json.items[0].contentDetails.relatedPlaylists.uploads }}"
+            },
+            {
+              "id": "config",
+              "name": "config",
+              "type": "object",
+              "value": "={{ $('Configuration').item.json }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7d7b3e20-68ed-4013-aa88-f915c2cdab83",
+      "name": "Extract Uploads Playlist ID",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4144,
+        864
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/playlistItems",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails"
+            },
+            {
+              "name": "playlistId",
+              "value": "={{ $json.uploadsPlaylistId }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "={{ $json.config.maxResults }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a5908219-db1d-4ef7-aba7-d5b16537f7a3",
+      "name": "Get Playlist Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4368,
+        864
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "googleApi": {
+          "id": "V8xYoZ4uNm1skmJG",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "id": "7b3be3ca-48de-4d2f-b13c-30e5834a66ee",
+      "name": "Split Out Videos",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        4592,
+        864
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails,statistics"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.contentDetails.videoId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c313d216-bd8d-434f-86f6-6ac0da3be8fd",
+      "name": "Get Video Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4816,
+        864
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "googleApi": {
+          "id": "V8xYoZ4uNm1skmJG",
+          "name": "Google Service Account account"
+        },
+        "youTubeOAuth2Api": {
+          "id": "ikJucBJAO1JGW3ry",
+          "name": "YouTube Account Jueguenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const video = $input.item.json.items[0];\nconst snippet = video.snippet;\nconst stats = video.statistics;\nconst contentDetails = video.contentDetails;\n\n// Extract tags or use empty array\nconst tags = snippet.tags ? snippet.tags.join(', ') : '';\n\n// Create searchable text by combining title, description, and tags\nconst searchableText = `${snippet.title} ${snippet.description} ${tags}`.toLowerCase();\n\nreturn {\n  json: {\n    videoId: video.id,\n    title: snippet.title,\n    description: snippet.description || '',\n    tags: tags,\n    publishedAt: snippet.publishedAt,\n    thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',\n    viewCount: parseInt(stats.viewCount || '0', 10),\n    duration: contentDetails.duration,\n    searchableText: searchableText\n  }\n};"
+      },
+      "id": "f5295367-c3e9-4e48-a0c0-4ec9e192d713",
+      "name": "Format Video Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        5040,
+        864
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "0dec244e-2cf9-4c6f-a9e3-89929cebb11c",
+      "name": "Loop Over Videos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        5264,
+        864
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Videos"
+        },
+        "filterByFormula": "={videoId}=\"{{ $json.videoId }}\"",
+        "options": {}
+      },
+      "id": "aeff7a8e-3da6-4a89-ab04-0696704c945d",
+      "name": "Check If Video Exists",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        5488,
+        944
+      ],
+      "typeVersion": 2.1,
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0lqReFYxwkzpvA2q",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-id",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.id }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "1c528685-d5d1-49b7-b6ef-33c9ff768b68",
+      "name": "Video Exists?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        5712,
+        944
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "viewCount": "={{ $('Format Video Data').item.json.viewCount }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "8daf3e33-30ad-43d9-8ed6-628e933ec3b4",
+      "name": "Update Video Stats",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        5936,
+        848
+      ],
+      "typeVersion": 2.1,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0lqReFYxwkzpvA2q",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.airtableBaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "videoId": "={{ $('Format Video Data').item.json.videoId }}",
+            "title": "={{ $('Format Video Data').item.json.title }}",
+            "description": "={{ $('Format Video Data').item.json.description }}",
+            "tags": "={{ $('Format Video Data').item.json.tags }}",
+            "publishedAt": "={{ $('Format Video Data').item.json.publishedAt }}",
+            "thumbnailUrl": "={{ $('Format Video Data').item.json.thumbnailUrl }}",
+            "viewCount": "={{ $('Format Video Data').item.json.viewCount }}",
+            "duration": "={{ $('Format Video Data').item.json.duration }}",
+            "searchableText": "={{ $('Format Video Data').item.json.searchableText }}",
+            "shareCount": 0
+          }
+        },
+        "options": {}
+      },
+      "id": "c750ffb0-7e3a-4b3c-84e6-646297a81bd3",
+      "name": "Insert New Video",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        5936,
+        1040
+      ],
+      "typeVersion": 2.1,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0lqReFYxwkzpvA2q",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "type": "string",
+              "value": "YouTube sync completed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ad1d630e-204e-47b1-ba84-9af7674a46c6",
+      "name": "Done",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        5264,
+        672
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "## YouTube Channel Sync\n\nSyncs your YouTube channel videos to Airtable for trend matching.\n\n### Setup\n\n1. **Google API Credentials**\n   - Enable YouTube Data API v3 in Google Cloud Console\n   - Create OAuth 2.0 credentials\n   - Add to n8n as Google API credential\n\n2. **Configuration Node**\n   - Set your YouTube Channel ID\n   - Set your Airtable Base ID\n\n3. **Airtable Credentials**\n   - Create Personal Access Token at airtable.com/account\n   - Add to n8n as Airtable credential\n\n### Schedule\n\n- Runs daily by default\n- Use Manual Trigger for initial load\n- First run will load up to 50 videos\n\n### Notes\n\n- YouTube API quota: ~100 units per channel request\n- Existing videos only get stats updated\n- New videos get full metadata inserted",
+        "height": 480,
+        "width": 560
+      },
+      "id": "864e10f8-b7f8-44db-bf8a-07de8b5b384e",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3040,
+        592
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 1. Fetch Videos from YouTube\nGets the uploads playlist, then fetches video details including stats, description, and tags.",
+        "height": 320,
+        "width": 900,
+        "color": 6
+      },
+      "id": "a2654e0a-8cbf-46b4-93e5-4cad23cb8cab",
+      "name": "Sticky Note - Fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3888,
+        704
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 2. Process & Store\nLoops through videos, checks if they exist in Airtable, and either updates stats or inserts new records.",
+        "height": 560,
+        "width": 780,
+        "color": 7
+      },
+      "id": "8cab7e21-b797-48cc-95b7-10fe8ae07727",
+      "name": "Sticky Note - Process",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5232,
+        608
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get Channel Upload Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Channel Upload Playlist": {
+      "main": [
+        [
+          {
+            "node": "Extract Uploads Playlist ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Uploads Playlist ID": {
+      "main": [
+        [
+          {
+            "node": "Get Playlist Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist Videos": {
+      "main": [
+        [
+          {
+            "node": "Split Out Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Videos": {
+      "main": [
+        [
+          {
+            "node": "Get Video Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Details": {
+      "main": [
+        [
+          {
+            "node": "Format Video Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Video Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Videos": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If Video Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Video Exists": {
+      "main": [
+        [
+          {
+            "node": "Video Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Exists?": {
+      "main": [
+        [
+          {
+            "node": "Update Video Stats",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert New Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Video Stats": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert New Video": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

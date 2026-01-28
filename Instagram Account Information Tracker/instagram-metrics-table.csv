@@ -1,0 +1,2 @@
+accountId,username,followersCount,followingCount,mediaCount,impressions,reach,profileViews,websiteClicks,engagementRate,accountType,verified,biography,website,profilePicUrl,category,lastChecked,status,notes
+sample_account_123,sample_user,1000,500,150,50000,30000,2000,100,3.5,BUSINESS,false,Sample Instagram bio,https://example.com,https://example.com/profile.jpg,Entertainment,2026-01-23T12:00:00.000Z,active,Sample notes

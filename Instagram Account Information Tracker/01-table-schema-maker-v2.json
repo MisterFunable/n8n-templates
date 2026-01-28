@@ -1,0 +1,224 @@
+{
+  "name": "Table Schema Maker v2 (Simplified)",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-schema-json",
+              "name": "schemaJSON",
+              "value": "={{ {} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "config-node-001",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        460
+      ],
+      "notes": "Paste your schema JSON in the schemaJSON field.\n\nExample:\n{\n  \"tableName\": \"My Table\",\n  \"backend\": \"n8n\",\n  \"fields\": [\n    {\n      \"name\": \"id\",\n      \"type\": \"string\",\n      \"required\": true\n    }\n  ]\n}"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "schema-id",
+              "name": "tableName",
+              "value": "={{ $json.schemaJSON.tableName }}",
+              "type": "string"
+            },
+            {
+              "id": "backend-id",
+              "name": "backend",
+              "value": "={{ $json.schemaJSON.backend }}",
+              "type": "string"
+            },
+            {
+              "id": "fields-id",
+              "name": "fields",
+              "value": "={{ $json.schemaJSON.fields }}",
+              "type": "array"
+            },
+            {
+              "id": "description-id",
+              "name": "description",
+              "value": "={{ $json.schemaJSON.description || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "parse-schema-001",
+      "name": "Parse Schema",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "backend-check",
+              "leftValue": "={{ $json.backend }}",
+              "rightValue": "n8n",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-backend-001",
+      "name": "Check Backend Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Data Table Creation Logic\nconst schema = $input.item.json;\nconst tableName = schema.tableName;\nconst fields = schema.fields;\n\n// Build field schema for n8n Data Table\nconst dataTableSchema = fields.map(field => {\n  const schemaField = {\n    id: field.name,\n    displayName: field.name,\n    type: mapTypeToN8N(field.type),\n    display: true,\n    required: field.required || false,\n    readOnly: false,\n    removed: false,\n    defaultMatch: false\n  };\n  \n  if (field.description) {\n    schemaField.description = field.description;\n  }\n  \n  return schemaField;\n});\n\nfunction mapTypeToN8N(type) {\n  const typeMap = {\n    'string': 'string',\n    'number': 'number',\n    'boolean': 'boolean',\n    'dateTime': 'dateTime',\n    'array': 'array',\n    'object': 'object',\n    'singleSelect': 'string',\n    'multipleSelect': 'array',\n    'url': 'string',\n    'email': 'string',\n    'phone': 'string',\n    'rating': 'number',\n    'duration': 'number',\n    'percent': 'number',\n    'currency': 'number',\n    'createdTime': 'dateTime',\n    'lastModifiedTime': 'dateTime',\n    'createdBy': 'string',\n    'lastModifiedBy': 'string',\n    'barcode': 'string'\n  };\n  \n  return typeMap[type] || 'string';\n}\n\nconst response = {\n  success: true,\n  backend: 'n8n',\n  tableName: tableName,\n  message: `Schema prepared for n8n Data Table: ${tableName}`,\n  note: 'n8n Data Tables must be created manually in the UI. Use the schema below to configure fields.',\n  schema: dataTableSchema,\n  instructions: [\n    '1. Go to your n8n instance',\n    '2. Navigate to Data Tables section',\n    '3. Click \"Add Data Table\"',\n    `4. Name it: ${tableName}`,\n    '5. Add columns using the schema below',\n    '6. Copy the Data Table ID and update your workflows'\n  ],\n  rawSchema: schema\n};\n\nreturn { json: response };"
+      },
+      "id": "create-n8n-001",
+      "name": "Create n8n Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Airtable Table Creation Logic\nconst schema = $input.item.json;\nconst tableName = schema.tableName;\nconst fields = schema.fields;\nconst airtableConfig = schema.airtableConfig || {};\n\nif (!airtableConfig.baseId) {\n  throw new Error('Airtable baseId is required when backend is \"airtable\". Add airtableConfig with baseId to your schema.');\n}\n\nconst airtableFields = fields.map(field => {\n  const fieldDef = {\n    name: field.name,\n    type: mapTypeToAirtable(field.type),\n    description: field.description || ''\n  };\n  \n  if (field.options) {\n    const options = {};\n    \n    if (field.options.choices && (field.type === 'singleSelect' || field.type === 'multipleSelect')) {\n      options.choices = field.options.choices.map(choice => ({ name: choice }));\n    }\n    \n    if (field.options.precision !== undefined) {\n      options.precision = field.options.precision;\n    }\n    \n    if (field.options.symbol) {\n      options.symbol = field.options.symbol;\n    }\n    \n    if (field.options.format) {\n      options.dateFormat = { name: field.options.format };\n    }\n    \n    if (field.type === 'rating') {\n      options.max = field.options.max || 5;\n      options.icon = field.options.icon || 'star';\n      options.color = field.options.color || 'yellow';\n    }\n    \n    if (field.options.durationFormat) {\n      options.durationFormat = field.options.durationFormat;\n    }\n    \n    if (field.options.formula) {\n      options.formula = field.options.formula;\n    }\n    \n    if (Object.keys(options).length > 0) {\n      fieldDef.options = options;\n    }\n  }\n  \n  return fieldDef;\n});\n\nfunction mapTypeToAirtable(type) {\n  const typeMap = {\n    'string': 'singleLineText',\n    'number': 'number',\n    'boolean': 'checkbox',\n    'dateTime': 'dateTime',\n    'array': 'multipleSelects',\n    'object': 'multilineText',\n    'singleSelect': 'singleSelect',\n    'multipleSelect': 'multipleSelects',\n    'url': 'url',\n    'email': 'email',\n    'phone': 'phoneNumber',\n    'rating': 'rating',\n    'duration': 'duration',\n    'percent': 'percent',\n    'currency': 'currency',\n    'count': 'count',\n    'rollup': 'rollup',\n    'lookup': 'lookup',\n    'formula': 'formula',\n    'createdTime': 'createdTime',\n    'lastModifiedTime': 'lastModifiedTime',\n    'createdBy': 'createdBy',\n    'lastModifiedBy': 'lastModifiedBy',\n    'autonumber': 'autoNumber',\n    'barcode': 'barcode',\n    'button': 'button'\n  };\n  \n  return typeMap[type] || 'singleLineText';\n}\n\nconst response = {\n  success: true,\n  backend: 'airtable',\n  tableName: tableName,\n  baseId: airtableConfig.baseId,\n  message: `Schema prepared for Airtable table: ${tableName}`,\n  note: 'Use the Airtable Meta API to create this table programmatically, or create manually in Airtable UI',\n  fields: airtableFields,\n  instructions: [\n    '1. Go to your Airtable base',\n    `2. Base ID: ${airtableConfig.baseId}`,\n    '3. Create a new table or use existing',\n    `4. Name it: ${tableName}`,\n    '5. Add fields using the configuration below',\n    '6. Or use Airtable Meta API to create programmatically'\n  ],\n  apiExample: {\n    method: 'POST',\n    url: `https://api.airtable.com/v0/meta/bases/${airtableConfig.baseId}/tables`,\n    headers: {\n      'Authorization': 'Bearer YOUR_AIRTABLE_API_KEY',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      name: tableName,\n      description: schema.description || '',\n      fields: airtableFields\n    }\n  },\n  rawSchema: schema\n};\n\nreturn { json: response };"
+      },
+      "id": "create-airtable-001",
+      "name": "Create Airtable Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "manual-trigger-001",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        20,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Table Schema Maker v2 (Simplified)\n\n**Easier to use - no file reading complexity!**\n\n### How to Use:\n\n1. **Edit Configuration Node**:\n   - Click the Configuration node\n   - In the schemaJSON field, paste your schema\n   - See the node notes for example\n\n2. **Example Schema**:\n```json\n{\n  \"tableName\": \"Instagram Metrics\",\n  \"backend\": \"n8n\",\n  \"fields\": [\n    {\n      \"name\": \"accountId\",\n      \"type\": \"string\",\n      \"required\": true\n    },\n    {\n      \"name\": \"followers\",\n      \"type\": \"number\"\n    }\n  ]\n}\n```\n\n3. **Run Workflow**:\n   - Click \"Test workflow\"\n   - Check output for instructions\n\n4. **For Airtable**:\n   - Set backend to \"airtable\"\n   - Add airtableConfig:\n```json\n{\n  \"tableName\": \"...\",\n  \"backend\": \"airtable\",\n  \"airtableConfig\": {\n    \"baseId\": \"appXXXXXXXXXXXXXX\"\n  },\n  \"fields\": [...]\n}\n```",
+        "height": 590.9646017699115,
+        "width": 456.3805309734513,
+        "color": 5
+      },
+      "id": "sticky-note-001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Parse Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Schema": {
+      "main": [
+        [
+          {
+            "node": "Check Backend Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Backend Type": {
+      "main": [
+        [
+          {
+            "node": "Create n8n Schema",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Airtable Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-23T00:00:00.000Z",
+  "versionId": "2"
+}

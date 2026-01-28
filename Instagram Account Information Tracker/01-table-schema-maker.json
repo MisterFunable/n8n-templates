@@ -1,0 +1,475 @@
+{
+  "name": "Table Schema Maker",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhookUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.response) }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Respond with Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "schema-id",
+              "name": "tableName",
+              "value": "={{ $json.tableName }}",
+              "type": "string"
+            },
+            {
+              "id": "backend-id",
+              "name": "backend",
+              "value": "={{ $json.backend }}",
+              "type": "string"
+            },
+            {
+              "id": "fields-id",
+              "name": "fields",
+              "value": "={{ $json.fields }}",
+              "type": "array"
+            },
+            {
+              "id": "description-id",
+              "name": "description",
+              "value": "={{ $json.description || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Parse Schema",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "backend-check",
+              "leftValue": "={{ $json.backend }}",
+              "rightValue": "n8n",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Check Backend Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Data Table Creation Logic\n// Note: n8n Data Tables must be created manually via UI first\n// This workflow documents the schema and prepares data format\n\nconst schema = $input.item.json;\nconst tableName = schema.tableName;\nconst fields = schema.fields;\n\n// Build field schema for n8n Data Table\nconst dataTableSchema = fields.map(field => {\n  const schemaField = {\n    id: field.name,\n    displayName: field.name,\n    type: mapTypeToN8N(field.type),\n    display: true,\n    required: field.required || false,\n    readOnly: false,\n    removed: false,\n    defaultMatch: false\n  };\n  \n  // Add description as comment\n  if (field.description) {\n    schemaField.description = field.description;\n  }\n  \n  return schemaField;\n});\n\n// Map schema types to n8n types\nfunction mapTypeToN8N(type) {\n  const typeMap = {\n    'string': 'string',\n    'number': 'number',\n    'boolean': 'boolean',\n    'dateTime': 'dateTime',\n    'array': 'array',\n    'object': 'object',\n    'singleSelect': 'string',\n    'multipleSelect': 'array',\n    'url': 'string',\n    'email': 'string',\n    'phone': 'string',\n    'rating': 'number',\n    'duration': 'number',\n    'percent': 'number',\n    'currency': 'number',\n    'createdTime': 'dateTime',\n    'lastModifiedTime': 'dateTime',\n    'createdBy': 'string',\n    'lastModifiedBy': 'string',\n    'barcode': 'string'\n  };\n  \n  return typeMap[type] || 'string';\n}\n\n// Create response\nconst response = {\n  success: true,\n  backend: 'n8n',\n  tableName: tableName,\n  message: `Schema prepared for n8n Data Table: ${tableName}`,\n  note: 'n8n Data Tables must be created manually in the UI. Use the schema below to configure fields.',\n  schema: dataTableSchema,\n  instructions: [\n    '1. Go to your n8n instance',\n    '2. Navigate to Data Tables section',\n    '3. Click \"Add Data Table\"',\n    `4. Name it: ${tableName}`,\n    '5. Add columns using the schema below',\n    '6. Copy the Data Table ID and update your workflows'\n  ],\n  rawSchema: schema\n};\n\nreturn { json: { response, tableName, backend: 'n8n' } };"
+      },
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+      "name": "Create n8n Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Airtable Table Creation Logic\n// Prepares API request to create table in Airtable\n\nconst schema = $input.item.json;\nconst tableName = schema.tableName;\nconst fields = schema.fields;\nconst airtableConfig = schema.airtableConfig || {};\n\nif (!airtableConfig.baseId) {\n  throw new Error('Airtable baseId is required when backend is \"airtable\"');\n}\n\n// Build field definitions for Airtable\nconst airtableFields = fields.map(field => {\n  const fieldDef = {\n    name: field.name,\n    type: mapTypeToAirtable(field.type),\n    description: field.description || ''\n  };\n  \n  // Add type-specific options\n  if (field.options) {\n    const options = {};\n    \n    // Single/Multiple Select choices\n    if (field.options.choices && (field.type === 'singleSelect' || field.type === 'multipleSelect')) {\n      options.choices = field.options.choices.map(choice => ({ name: choice }));\n    }\n    \n    // Number precision\n    if (field.options.precision !== undefined) {\n      options.precision = field.options.precision;\n    }\n    \n    // Currency symbol\n    if (field.options.symbol) {\n      options.symbol = field.options.symbol;\n    }\n    \n    // Date format\n    if (field.options.format) {\n      options.dateFormat = { name: field.options.format };\n    }\n    \n    // Rating options\n    if (field.type === 'rating') {\n      options.max = field.options.max || 5;\n      options.icon = field.options.icon || 'star';\n      options.color = field.options.color || 'yellow';\n    }\n    \n    // Duration format\n    if (field.options.durationFormat) {\n      options.durationFormat = field.options.durationFormat;\n    }\n    \n    // Formula\n    if (field.options.formula) {\n      options.formula = field.options.formula;\n    }\n    \n    if (Object.keys(options).length > 0) {\n      fieldDef.options = options;\n    }\n  }\n  \n  return fieldDef;\n});\n\n// Map schema types to Airtable types\nfunction mapTypeToAirtable(type) {\n  const typeMap = {\n    'string': 'singleLineText',\n    'number': 'number',\n    'boolean': 'checkbox',\n    'dateTime': 'dateTime',\n    'array': 'multipleSelects',\n    'object': 'multilineText',\n    'singleSelect': 'singleSelect',\n    'multipleSelect': 'multipleSelects',\n    'url': 'url',\n    'email': 'email',\n    'phone': 'phoneNumber',\n    'rating': 'rating',\n    'duration': 'duration',\n    'percent': 'percent',\n    'currency': 'currency',\n    'count': 'count',\n    'rollup': 'rollup',\n    'lookup': 'lookup',\n    'formula': 'formula',\n    'createdTime': 'createdTime',\n    'lastModifiedTime': 'lastModifiedTime',\n    'createdBy': 'createdBy',\n    'lastModifiedBy': 'lastModifiedBy',\n    'autonumber': 'autoNumber',\n    'barcode': 'barcode',\n    'button': 'button'\n  };\n  \n  return typeMap[type] || 'singleLineText';\n}\n\n// Create response with Airtable configuration\nconst response = {\n  success: true,\n  backend: 'airtable',\n  tableName: tableName,\n  baseId: airtableConfig.baseId,\n  message: `Schema prepared for Airtable table: ${tableName}`,\n  note: 'Use the Airtable node or Meta API to create this table programmatically, or create manually in Airtable UI',\n  fields: airtableFields,\n  instructions: [\n    '1. Go to your Airtable base',\n    `2. Base ID: ${airtableConfig.baseId}`,\n    '3. Create a new table or use existing',\n    `4. Name it: ${tableName}`,\n    '5. Add fields using the configuration below',\n    '6. Alternatively, use Airtable API to create programmatically'\n  ],\n  apiExample: {\n    method: 'POST',\n    url: `https://api.airtable.com/v0/meta/bases/${airtableConfig.baseId}/tables`,\n    headers: {\n      'Authorization': 'Bearer YOUR_AIRTABLE_API_KEY',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      name: tableName,\n      description: schema.description || '',\n      fields: airtableFields\n    }\n  },\n  rawSchema: schema\n};\n\nreturn { json: { response, tableName, backend: 'airtable' } };"
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+      "name": "Create Airtable Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-schema-source",
+              "name": "schemaSource",
+              "value": "manual",
+              "type": "string"
+            },
+            {
+              "id": "config-schema-file",
+              "name": "schemaFilePath",
+              "value": "/path/to/schema.json",
+              "type": "string"
+            },
+            {
+              "id": "config-schema-json",
+              "name": "schemaJSON",
+              "value": "={{ {} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        20,
+        460
+      ],
+      "notes": "Configure how to provide the schema:\n- schemaSource: 'manual' to provide JSON directly, 'file' to read from file\n- schemaFilePath: Path to JSON schema file (if using 'file' source)\n- schemaJSON: Paste your schema JSON here (if using 'manual' source)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "source-check",
+              "leftValue": "={{ $json.schemaSource }}",
+              "rightValue": "file",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-3456-0123-567890123456",
+      "name": "Check Schema Source",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "filePath": "={{ $('Configuration').item.json.schemaFilePath }}",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4567-1234-678901234567",
+      "name": "Read Schema File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        460,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "manual-schema",
+              "name": "schemaData",
+              "value": "={{ $('Configuration').item.json.schemaJSON }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c9d0e1f2-a3b4-5678-2345-789012345678",
+      "name": "Use Manual Schema",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-6789-3456-890123456789",
+      "name": "Merge Schema Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        680,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "e1f2a3b4-c5d6-7890-4567-901234567890",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1380,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-table",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-8901-5678-012345678901",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        460
+      ],
+      "webhookId": "table-schema-maker"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {}
+      },
+      "id": "a2b3c4d5-e6f7-8901-6789-123456789012",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse JSON from file or manual input\nconst input = $input.item;\nlet schemaData;\n\nif (input.json.schemaData) {\n  // Manual input\n  schemaData = input.json.schemaData;\n} else if (input.binary && input.binary.data) {\n  // File input\n  const fileContent = Buffer.from(input.binary.data.data, 'base64').toString('utf-8');\n  schemaData = JSON.parse(fileContent);\n} else {\n  throw new Error('No schema data found');\n}\n\nreturn { json: schemaData };"
+      },
+      "id": "b3c4d5e6-f7a8-9012-7890-234567890123",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Table Schema Maker\n\nThis workflow creates table schemas for either n8n Data Tables or Airtable based on a JSON schema definition.\n\n### How to Use:\n\n1. **Configure Schema Source**:\n   - In the Configuration node, set:\n     - `schemaSource`: 'manual' or 'file'\n     - If 'file': provide path in `schemaFilePath`\n     - If 'manual': paste JSON in `schemaJSON`\n\n2. **Schema Format**:\n   ```json\n   {\n     \"tableName\": \"Your Table Name\",\n     \"backend\": \"n8n\" or \"airtable\",\n     \"fields\": [\n       {\n         \"name\": \"fieldName\",\n         \"type\": \"string\",\n         \"description\": \"Field description\",\n         \"required\": false,\n         \"options\": {}\n       }\n     ]\n   }\n   ```\n\n3. **Run the Workflow**:\n   - Execute manually or trigger via webhook\n   - Receive schema configuration and instructions\n\n### Notes:\n- n8n Data Tables must be created manually in UI\n- Airtable tables can be created via API or manually\n- See field-types-reference.md for all supported field types",
+        "height": 464.8453462916896,
+        "width": 389.0112583080106,
+        "color": 5
+      },
+      "id": "c4d5e6f7-a8b9-0123-8901-345678901234",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Check Schema Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Schema Source": {
+      "main": [
+        [
+          {
+            "node": "Read Schema File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Manual Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Schema File": {
+      "main": [
+        [
+          {
+            "node": "Merge Schema Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Manual Schema": {
+      "main": [
+        [
+          {
+            "node": "Merge Schema Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Schema Data": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Parse Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Schema": {
+      "main": [
+        [
+          {
+            "node": "Check Backend Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Backend Type": {
+      "main": [
+        [
+          {
+            "node": "Create n8n Schema",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Airtable Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create n8n Schema": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Airtable Schema": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-23T00:00:00.000Z",
+  "versionId": "1"
+}

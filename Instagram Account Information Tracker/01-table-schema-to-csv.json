@@ -1,0 +1,144 @@
+{
+  "name": "Table Schema to CSV Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-schema-json",
+              "name": "schemaJSON",
+              "value": "={{ {} }}",
+              "type": "object"
+            },
+            {
+              "id": "config-include-sample",
+              "name": "includeSampleRow",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "config-node-001",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        460
+      ],
+      "notes": "Paste your schema JSON in schemaJSON field.\nSet includeSampleRow to true to include example data row."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate CSV from schema for n8n Data Table import\nconst schema = $input.item.json.schemaJSON;\nconst includeSample = $input.item.json.includeSampleRow;\n\nif (!schema || !schema.fields) {\n  throw new Error('Invalid schema: must have fields array');\n}\n\n// Build CSV header from field names\nconst headers = schema.fields.map(field => field.name);\n\n// Build sample data row if requested\nlet sampleRow = [];\nif (includeSample) {\n  sampleRow = schema.fields.map(field => {\n    // Generate sample data based on field type\n    switch(field.type) {\n      case 'string':\n      case 'url':\n      case 'email':\n      case 'phone':\n        return field.name === 'accountId' ? 'sample_account_123' :\n               field.name.includes('email') ? 'user@example.com' :\n               field.name.includes('url') || field.name.includes('website') ? 'https://example.com' :\n               field.name.includes('phone') ? '+1234567890' :\n               `Sample ${field.name}`;\n      \n      case 'number':\n      case 'currency':\n        return field.name.includes('count') || field.name.includes('followers') ? '1000' :\n               field.name.includes('rate') ? '5.5' :\n               '100';\n      \n      case 'percent':\n        return '75.5';\n      \n      case 'boolean':\n        return 'false';\n      \n      case 'dateTime':\n      case 'createdTime':\n      case 'lastModifiedTime':\n        return new Date().toISOString();\n      \n      case 'rating':\n        return '4';\n      \n      case 'singleSelect':\n        return field.options?.choices?.[0] || 'Option1';\n      \n      case 'multipleSelect':\n      case 'array':\n        return field.options?.choices ? \n          `\"${field.options.choices.slice(0, 2).join(', ')}\"` : \n          '\"Item1, Item2\"';\n      \n      case 'object':\n        return '{\"key\": \"value\"}';\n      \n      default:\n        return `Sample ${field.type}`;\n    }\n  });\n}\n\n// Build CSV content\nlet csvContent = headers.join(',') + '\\n';\nif (includeSample && sampleRow.length > 0) {\n  csvContent += sampleRow.join(',') + '\\n';\n}\n\n// Create response\nreturn {\n  json: {\n    tableName: schema.tableName,\n    backend: schema.backend,\n    csvContent: csvContent,\n    headers: headers,\n    sampleRow: sampleRow,\n    fieldCount: headers.length,\n    instructions: [\n      '1. Copy the CSV content below',\n      '2. Save it as a .csv file',\n      '3. In n8n, go to Data Tables',\n      '4. Click \"Add Data Table\"',\n      `5. Name it: ${schema.tableName}`,\n      '6. Click \"Import from CSV\"',\n      '7. Upload your CSV file',\n      '8. Review the field types and adjust if needed',\n      '9. Click \"Create\"',\n      '10. Copy the Data Table ID for use in workflows'\n    ]\n  },\n  binary: {\n    data: {\n      data: Buffer.from(csvContent).toString('base64'),\n      mimeType: 'text/csv',\n      fileName: `${schema.tableName.replace(/\\s+/g, '_')}.csv`\n    }\n  }\n};"
+      },
+      "id": "generate-csv-001",
+      "name": "Generate CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "propertyName": "csvFile",
+        "options": {
+          "encoding": "utf8",
+          "fileName": "={{ $json.binary.data.fileName }}"
+        }
+      },
+      "id": "format-output-001",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "typeVersion": 1,
+      "position": [
+        680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "manual-trigger-001",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        20,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Table Schema to CSV Generator\n\nGenerates CSV files from schema JSON for easy n8n Data Table import.\n\n### How to Use:\n\n1. **Paste your schema** in Configuration node\n2. **Click Test workflow**\n3. **Download the CSV** from output\n4. **Import to n8n Data Tables**\n\n### Benefits:\n\n✅ No manual field creation\n✅ Faster table setup\n✅ Includes sample data\n✅ Correct field structure\n\n### Example:\n\nConfiguration node:\n```json\n{\n  \"tableName\": \"Instagram Metrics\",\n  \"backend\": \"n8n\",\n  \"fields\": [\n    {\"name\": \"accountId\", \"type\": \"string\"},\n    {\"name\": \"followers\", \"type\": \"number\"}\n  ]\n}\n```\n\nOutput:\n```csv\naccountId,followers\nsample_account_123,1000\n```\n\n### Tips:\n\n- Set `includeSampleRow: true` for example data\n- Set `includeSampleRow: false` for headers only\n- n8n will auto-detect field types from CSV\n- Review and adjust types after import",
+        "height": 635.3451327433629,
+        "width": 456.3805309734513,
+        "color": 5
+      },
+      "id": "sticky-note-001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Generate CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate CSV": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-23T00:00:00.000Z",
+  "versionId": "1"
+}
