@@ -25,6 +25,7 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
 
 **Social Media Cross-Posting:**
 - Instagram to X
+- Instagram Auto Accept Collabs
 - Upload from Instagram to YouTube
 
 **YouTube Management:**
@@ -45,6 +46,10 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
 - ADR Researcher (2 LLM versions)
 - Web Research Social Links Finder (3 search methods)
 
+**Error Workflows:**
+- Error Workflow - Slack Notifier
+- Error Workflow - Discord Notifier
+
 ### Available Workflows
 
 1. **Instagram to X** (`Instagram to X/template.json`)
@@ -52,27 +57,35 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
    - Uses Data Tables for deduplication (postId tracking)
    - Schedule-triggered (every 12 hours)
 
-2. **Auto-Translate YouTube Video** (`Auto-Translate YouTube Video Content with Google Gemini AI/template.json`)
+2. **Instagram Auto Accept Collabs** (`Instagram Auto Accept Collabs/template.json`)
+   - Automatically accepts or declines collaboration invites on Instagram
+   - Uses Instagram API with Facebook Login (new endpoint from Dec 2025)
+   - Configurable: accept all, decline all, or whitelist specific usernames
+   - Data Tables for tracking processed invites
+   - Schedule-triggered (every 15 minutes default)
+   - Required permission: `instagram_basic`
+
+3. **Auto-Translate YouTube Video** (`Auto-Translate YouTube Video Content with Google Gemini AI/template.json`)
    - Translates YouTube video titles/descriptions using Google Gemini AI
    - Manual trigger workflow
    - Processes multiple language localizations
 
-3. **Auto-Translate YouTube Video (Loop Lookup Ver)** (`Auto-Translate YouTube Video (Loop Lookup Ver)/template.json`)
+4. **Auto-Translate YouTube Video (Loop Lookup Ver)** (`Auto-Translate YouTube Video (Loop Lookup Ver)/template.json`)
    - Optimized version with loop-based processing
    - Enhanced lookup mechanism for better performance
 
-4. **Upload from Instagram to YouTube** (`Upload from Instagram To YouTube/template.json`)
+5. **Upload from Instagram to YouTube** (`Upload from Instagram To YouTube/template.json`)
    - Downloads Instagram videos and uploads to YouTube
    - Includes title truncation logic and hashtag processing
    - Daily schedule trigger (midnight)
 
-5. **YouTube Channel Watermark Updater** (`YouTube Channel Watermark Updater/template.json`)
+6. **YouTube Channel Watermark Updater** (`YouTube Channel Watermark Updater/template.json`)
    - Sets/updates YouTube channel watermark
    - Manual trigger for one-time operations
    - Auto-detects channel ID from OAuth credentials
    - V2 available for multi-account updates (7 channels at once)
 
-6. **YouTube Channel Settings Audit** (`YouTube Channel Settings Audit/template.json`)
+7. **YouTube Channel Settings Audit** (`YouTube Channel Settings Audit/template.json`)
    - Audits YouTube channel optimization across branding, SEO, and content
    - Scores channel on 165-point scale (normalized to 100)
    - Identifies critical issues and priority actions
@@ -82,14 +95,14 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
      - 100-point scoring system weighted toward algorithm factors
      - Critical settings detection (Made for Kids, privacy, category)
 
-7. **AI-Powered YouTube Channel Optimizer** (`AI-Powered YouTube Channel Optimizer/template.json`)
+8. **AI-Powered YouTube Channel Optimizer** (`AI-Powered YouTube Channel Optimizer/template.json`)
    - Uses Google Gemini AI to analyze channel performance
    - Generates optimized channel descriptions and keywords
    - Creates video title and description templates
    - Provides tag strategy and content insights
    - Based on analysis of top-performing videos (data-driven recommendations)
 
-8. **YouTube Featured Channels Updater** (`YouTube Featured Channels Updater/template.json`)
+9. **YouTube Featured Channels Updater** (`YouTube Featured Channels Updater/template.json`)
    - Sets/updates featured channels on YouTube home tab layout
    - Places featured channels section as first row (position 0)
    - Supports predefined list of channels in specific order
@@ -100,48 +113,64 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
      - Section title: "Cultured Corner 🍷"
      - Features: Jueguenable, Legoenable, Dollenable, Posenable, Statuenable
 
-9. **YouTube Channel Subscriber** (`YouTube Channel Subscriber/template.json`)
-   - Subscribes to a predefined list of channels
-   - Automatically excludes the calling channel (can't subscribe to yourself)
-   - Handles "already subscribed" gracefully
-   - Rate-limited to avoid API restrictions (2s delay between subscriptions)
-   - Generates detailed report with subscription status
+10. **YouTube Channel Subscriber** (`YouTube Channel Subscriber/template.json`)
+    - Subscribes to a predefined list of channels
+    - Automatically excludes the calling channel (can't subscribe to yourself)
+    - Handles "already subscribed" gracefully
+    - Rate-limited to avoid API restrictions (2s delay between subscriptions)
+    - Generates detailed report with subscription status
 
-10. **Instagram Account Information Tracker** (`Instagram Account Information Tracker/`)
-   - Tracks Instagram account metrics over time
-   - Supports both n8n Data Tables and Airtable backends
-   - Schema-as-code approach with JSON definitions
-   - Multiple setup methods: CSV import (fastest), schema workflow, or manual
-   - Tracks account info, follower counts, insights (impressions, reach, profile views)
-   - Automatic deduplication and update logic
-   - Schedule-triggered (every 6 hours default)
+11. **Instagram Account Information Tracker** (`Instagram Account Information Tracker/`)
+    - Tracks Instagram account metrics over time
+    - Supports both n8n Data Tables and Airtable backends
+    - Schema-as-code approach with JSON definitions
+    - Multiple setup methods: CSV import (fastest), schema workflow, or manual
+    - Tracks account info, follower counts, insights (impressions, reach, profile views)
+    - Automatic deduplication and update logic
+    - Schedule-triggered (every 6 hours default)
 
-11. **Trend Reshare System** (`Trend Reshare System/`)
-   - Multi-workflow system for trend-based content resharing
-   - Monitors Google Trends for niche-relevant topics (dolls, action figures, LEGO, board games)
-   - Syncs YouTube channel videos to Airtable
-   - Matches trending topics to existing video content
-   - Automatically posts to X/Twitter with optimized formatting
-   - Prevents over-sharing with cooldown tracking
-   - 4 workflows: Airtable setup, YouTube sync, trend monitor, trend poster
+12. **Trend Reshare System** (`Trend Reshare System/`)
+    - Multi-workflow system for trend-based content resharing
+    - Monitors Google Trends for niche-relevant topics (dolls, action figures, LEGO, board games)
+    - Syncs YouTube channel videos to Airtable
+    - Matches trending topics to existing video content
+    - Automatically posts to X/Twitter with optimized formatting
+    - Prevents over-sharing with cooldown tracking
+    - 4 workflows: Airtable setup, YouTube sync, trend monitor, trend poster
 
-12. **ADR Researcher** (`ADR Researcher/`)
-   - AI-powered engineering documentation assistant
-   - Creates Architecture Decision Records (ADRs) following MADR template
-   - Generates procedures, runbooks, and technical documentation
-   - Interactive conversation with memory for follow-up questions
-   - Web research with source citations via SerpAPI
-   - Two versions: OpenAI GPT-4o (template.json) and Anthropic Claude (template-anthropic.json)
-   - Outputs: Markdown, JSON, or structured ADR format
+13. **ADR Researcher** (`ADR Researcher/`)
+    - AI-powered engineering documentation assistant
+    - Creates Architecture Decision Records (ADRs) following MADR template
+    - Generates procedures, runbooks, and technical documentation
+    - Interactive conversation with memory for follow-up questions
+    - Web research with source citations via SerpAPI
+    - Two versions: OpenAI GPT-4o (template.json) and Anthropic Claude (template-anthropic.json)
+    - Outputs: Markdown, JSON, or structured ADR format
 
-13. **Web Research Social Links Finder** (`Web Research Social Links Finder/`)
-   - Automated website research and social media link extraction
-   - Uses Gemini AI for intelligent link discovery
-   - Three search methods: direct URLs, SerpAPI, or Google Custom Search
-   - Extracts Instagram, Facebook, Twitter/X, YouTube, TikTok, Pinterest, LinkedIn, Etsy, emails
-   - Regex extraction + AI verification for accuracy
-   - Deduplicates and aggregates results across multiple sites
-   - Free tier compatible (Gemini 1.5 Flash)
+14. **Web Research Social Links Finder** (`Web Research Social Links Finder/`)
+    - Automated website research and social media link extraction
+    - Uses Gemini AI for intelligent link discovery
+    - Three search methods: direct URLs, SerpAPI, or Google Custom Search
+    - Extracts Instagram, Facebook, Twitter/X, YouTube, TikTok, Pinterest, LinkedIn, Etsy, emails
+    - Regex extraction + AI verification for accuracy
+    - Deduplicates and aggregates results across multiple sites
+    - Free tier compatible (Gemini 1.5 Flash)
+
+15. **Error Workflow - Slack Notifier** (`Error Workflows/Slack Notifier/template.json`)
+    - Dedicated error handler workflow for monitoring other workflows
+    - Sends formatted Block Kit messages to Slack on failure
+    - Includes workflow name, failed node, error message, timestamp
+    - Direct link to failed execution for quick debugging
+    - Configurable: channel, environment label, user mentions
+    - Set as "Error Workflow" in other workflows' settings
+
+16. **Error Workflow - Discord Notifier** (`Error Workflows/Discord Notifier/template.json`)
+    - Dedicated error handler workflow for monitoring other workflows
+    - Sends formatted embed messages to Discord via webhook
+    - Color-coded by error type (red, yellow, orange, purple)
+    - No bot/app required - just needs webhook URL
+    - Includes workflow name, failed node, error message, timestamp
+    - Direct link to failed execution for quick debugging
 
 ## Working with n8n Workflow Templates
 
@@ -456,6 +485,10 @@ See `docs/workflow-analysis.md` for detailed issue analysis and improvement reco
 │   ├── template.json
 │   ├── template-v2.json
 │   └── README.md
+├── Instagram Auto Accept Collabs/
+│   ├── template.json
+│   ├── README.md
+│   └── SETUP-GUIDE.md            # Detailed credential setup instructions
 ├── Auto-Translate YouTube Video Content with Google Gemini AI/
 │   ├── template.json
 │   └── README.md
@@ -517,6 +550,14 @@ See `docs/workflow-analysis.md` for detailed issue analysis and improvement reco
 │   ├── template.json                # Google Custom Search version
 │   ├── template-serpapi.json        # SerpAPI version
 │   └── template-direct-urls.json    # Direct URL input (no search API)
+├── Error Workflows/
+│   ├── README.md                     # Parent overview
+│   ├── Slack Notifier/
+│   │   ├── template.json
+│   │   └── README.md
+│   └── Discord Notifier/
+│       ├── template.json
+│       └── README.md
 ├── docs/
 │   ├── n8n-deep-dive-guide.md           # Comprehensive n8n tutorial
 │   └── workflow-analysis.md              # Critical analysis and improvements
@@ -642,9 +683,11 @@ Use this pattern when:
 **Needs End-to-End Testing:**
 - YouTube Channel Settings Audit (V1 and V2)
 - Instagram Account Information Tracker
+- Instagram Auto Accept Collabs
 - Trend Reshare System
 - ADR Researcher
 - Web Research Social Links Finder
+- Error Workflows (Slack & Discord Notifiers)
 
 These untested workflows are structurally complete with full documentation but require live API credentials for full validation.
 

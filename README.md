@@ -28,6 +28,7 @@ A curated collection of n8n automation templates for social media management, Yo
 | Template | Description | Tested | n8n.io |
 |----------|-------------|--------|--------|
 | [Instagram to X](./Instagram%20to%20X) | Automatically cross-post your Instagram content to X (Twitter) | ✅ | - |
+| [Instagram Auto Accept Collabs](./Instagram%20Auto%20Accept%20Collabs) | Automatically accept or decline collaboration invites on Instagram | ⏳ | - |
 | [Upload from Instagram to YouTube](./Upload%20from%20Instagram%20To%20YouTube) | Download Instagram videos and upload to YouTube with optimized metadata | ✅ | [View](https://n8n.io/workflows/12773-batch-upload-instagram-reels-to-youtube-with-scheduled-delays/) |
 
 ### YouTube Management
@@ -60,6 +61,13 @@ A curated collection of n8n automation templates for social media management, Yo
 |----------|-------------|--------|--------|
 | [ADR Researcher](./ADR%20Researcher) | AI-powered engineering documentation assistant (OpenAI/Anthropic) | ⏳ | - |
 | [Web Research Social Links Finder](./Web%20Research%20Social%20Links%20Finder) | Extract social media links from websites using Gemini AI | ⏳ | - |
+
+### Error Workflows
+
+| Template | Description | Tested | n8n.io |
+|----------|-------------|--------|--------|
+| [Error Workflows - Slack Notifier](./Error%20Workflows/Slack%20Notifier) | Send formatted Slack alerts when workflows fail | ⏳ | - |
+| [Error Workflows - Discord Notifier](./Error%20Workflows/Discord%20Notifier) | Send formatted Discord alerts when workflows fail | ⏳ | - |
 
 **Legend:** ✅ Tested & Working | ⏳ Needs Testing
 
@@ -153,9 +161,11 @@ Explore my n8n guides on Medium for in-depth tutorials:
 Several templates are marked ⏳ and need end-to-end testing:
 - Trend Reshare System
 - Instagram Account Information Tracker
+- Instagram Auto Accept Collabs
 - ADR Researcher
 - Web Research Social Links Finder
 - YouTube Channel Settings Audit
+- Error Workflows (Slack & Discord)
 
 If you test any of these and confirm they work, please open an issue or PR!
 

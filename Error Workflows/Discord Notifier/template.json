@@ -1,0 +1,213 @@
+{
+  "name": "Error Workflow - Discord Notifier",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger-001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-webhook-url",
+              "name": "webhookUrl",
+              "value": "YOUR_DISCORD_WEBHOOK_URL",
+              "type": "string"
+            },
+            {
+              "id": "config-mention-role",
+              "name": "mentionRole",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "config-n8n-base-url",
+              "name": "n8nBaseUrl",
+              "value": "https://your-n8n-instance.com",
+              "type": "string"
+            },
+            {
+              "id": "config-environment",
+              "name": "environment",
+              "value": "production",
+              "type": "string"
+            },
+            {
+              "id": "config-bot-name",
+              "name": "botName",
+              "value": "n8n Alerts",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-node-001",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "notes": "Configure:\n- webhookUrl: Discord webhook URL for the channel\n- mentionRole: Role ID to mention (e.g., <@&123456789>) or empty\n- n8nBaseUrl: Your n8n instance URL for execution links\n- environment: Label for the environment (production, staging, etc.)\n- botName: Name to display for the bot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract error information from the error trigger\nconst errorData = $input.first().json;\nconst config = $('Configuration').item.json;\n\n// Get execution details - handle different n8n versions\nconst execution = errorData.execution || {};\nconst workflow = errorData.workflow || {};\nconst error = execution.error || errorData.error || {};\n\n// Extract error details with multiple fallbacks\nconst workflowName = workflow.name || errorData.workflow?.name || 'Unknown Workflow';\nconst workflowId = workflow.id || errorData.workflow?.id || 'unknown';\nconst executionId = execution.id || errorData.execution?.id || 'unknown';\n\n// Error message - check multiple possible locations\nlet errorMessage = error.message \n  || error.description \n  || execution.error?.message \n  || 'Unknown error';\n\n// Error node - check multiple possible locations  \nconst errorNode = error.node?.name \n  || execution.lastNodeExecuted \n  || error.context?.nodeName\n  || 'Unknown node';\n\nconst errorTimestamp = error.timestamp || execution.startedAt || new Date().toISOString();\n\n// Build execution URL\nconst executionUrl = `${config.n8nBaseUrl}/workflow/${workflowId}/executions/${executionId}`;\n\n// Format timestamp for Discord\nconst timestamp = new Date(errorTimestamp).toISOString();\n\n// Truncate error message if too long (Discord embed limit)\nconst truncatedMessage = errorMessage.length > 1000 \n  ? errorMessage.substring(0, 997) + '...' \n  : errorMessage;\n\n// Clean up error message\nconst cleanedMessage = truncatedMessage\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\n// Determine color based on error type (Discord uses decimal colors)\nlet embedColor = 15548997; // Red default\nif (errorMessage.toLowerCase().includes('timeout')) {\n  embedColor = 16776960; // Yellow\n} else if (errorMessage.toLowerCase().includes('rate limit')) {\n  embedColor = 16744448; // Orange\n} else if (errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('401') || errorMessage.toLowerCase().includes('403')) {\n  embedColor = 10038562; // Purple\n}\n\n// Build mention text\nconst mentionText = config.mentionRole ? `${config.mentionRole} ` : '';\n\nreturn {\n  json: {\n    workflowName,\n    workflowId,\n    executionId,\n    executionUrl,\n    errorMessage: cleanedMessage,\n    errorNode,\n    timestamp,\n    environment: config.environment,\n    webhookUrl: config.webhookUrl,\n    botName: config.botName,\n    mentionText,\n    embedColor\n  }\n};"
+      },
+      "id": "extract-error-001",
+      "name": "Extract Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhookUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"username\": \"{{ $json.botName }}\",\n  \"avatar_url\": \"https://n8n.io/favicon.ico\",\n  \"content\": \"{{ $json.mentionText }}\",\n  \"embeds\": [\n    {\n      \"title\": \"Workflow Error Alert\",\n      \"description\": \"A workflow has failed and requires attention.\",\n      \"color\": {{ $json.embedColor }},\n      \"fields\": [\n        {\n          \"name\": \"Workflow\",\n          \"value\": \"{{ $json.workflowName }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Environment\",\n          \"value\": \"{{ $json.environment }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Failed Node\",\n          \"value\": \"{{ $json.errorNode }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Error Message\",\n          \"value\": \"```{{ $json.errorMessage }}```\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"Execution Link\",\n          \"value\": \"[View Execution]({{ $json.executionUrl }})\",\n          \"inline\": false\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Execution ID: {{ $json.executionId }} | Workflow ID: {{ $json.workflowId }}\"\n      },\n      \"timestamp\": \"{{ $json.timestamp }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "send-discord-001",
+      "name": "Send Discord Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "width": 700,
+        "height": 520,
+        "content": "## Error Workflow - Discord Notifier\n\nThis workflow catches errors from other workflows and sends formatted alerts to Discord.\n\n### Setup\n\n1. **Create a Discord Webhook**:\n   - Go to your Discord server\n   - Channel Settings → Integrations → Webhooks\n   - Click \"New Webhook\" and copy the URL\n\n2. **Update Configuration node**:\n   - `webhookUrl`: Your Discord webhook URL\n   - `mentionRole`: Role to mention (e.g., `<@&123456789>`)\n   - `n8nBaseUrl`: Your n8n instance URL\n   - `environment`: Label for alerts (production, staging)\n   - `botName`: Name displayed for the bot\n\n3. **Link to other workflows**:\n   - Open the workflow you want to monitor\n   - Go to Settings → Error Workflow\n   - Select this workflow\n\n### Alert Contents\n\n- Workflow name that failed\n- Environment label\n- Node that caused the error\n- Error message\n- Direct link to failed execution\n- Color-coded by error type\n\n### Note\n\nThis workflow uses Discord webhooks - no bot token required!"
+      },
+      "id": "sticky-instructions-001",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "color": 2,
+        "width": 200,
+        "height": 180,
+        "content": "## Error Trigger\nCatches failures from linked workflows"
+      },
+      "id": "sticky-trigger-001",
+      "name": "Sticky Note - Trigger",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "color": 5,
+        "width": 200,
+        "height": 180,
+        "content": "## Configuration\nWebhook URL & settings"
+      },
+      "id": "sticky-config-001",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "color": 7,
+        "width": 200,
+        "height": 180,
+        "content": "## Extract Details\nFormat error info"
+      },
+      "id": "sticky-extract-001",
+      "name": "Sticky Note - Extract",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "color": 3,
+        "width": 200,
+        "height": 180,
+        "content": "## Send Alert\nPost to Discord"
+      },
+      "id": "sticky-discord-001",
+      "name": "Sticky Note - Discord",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        620,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Details": {
+      "main": [
+        [
+          {
+            "node": "Send Discord Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

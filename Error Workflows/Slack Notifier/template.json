@@ -1,0 +1,218 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5858489d-f876-4008-8a45-0d18460c39e4",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-slack-channel",
+              "name": "slackChannel",
+              "value": "youtube",
+              "type": "string"
+            },
+            {
+              "id": "config-mention-on-error",
+              "name": "mentionOnError",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "config-n8n-base-url",
+              "name": "n8nBaseUrl",
+              "value": "https://your-n8n-instance.com",
+              "type": "string"
+            },
+            {
+              "id": "config-environment",
+              "name": "environment",
+              "value": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "47c75866-387f-48c1-94ff-498d9460eb74",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        288
+      ],
+      "notes": "Configure:\n- slackChannel: Channel to post errors (e.g., #n8n-alerts)\n- mentionOnError: User/group to mention (e.g., @channel, <@U12345>)\n- n8nBaseUrl: Your n8n instance URL for execution links\n- environment: Label for the environment (production, staging, etc.)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract error information from the error trigger\nconst errorData = $input.first().json;\nconst config = $('Configuration').item.json;\n\n// Get execution details\nconst execution = errorData.execution || {};\nconst workflow = errorData.workflow || {};\nconst error = execution.error || {};\n\n// Extract error details\nconst workflowName = workflow.name || 'Unknown Workflow';\nconst workflowId = workflow.id || 'unknown';\nconst executionId = execution.id || 'unknown';\nconst errorMessage = error.message || 'Unknown error';\nconst errorNode = error.node?.name || 'Unknown node';\nconst errorNodeType = error.node?.type || '';\nconst errorTimestamp = error.timestamp || new Date().toISOString();\nconst errorStack = error.stack || '';\n\n// Build execution URL\nconst executionUrl = `${config.n8nBaseUrl}/workflow/${workflowId}/executions/${executionId}`;\n\n// Format timestamp\nconst formattedTime = new Date(errorTimestamp).toLocaleString('en-US', {\n  timeZone: 'UTC',\n  year: 'numeric',\n  month: 'short',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  timeZoneName: 'short'\n});\n\n// Truncate error message if too long\nconst truncatedMessage = errorMessage.length > 500 \n  ? errorMessage.substring(0, 500) + '...' \n  : errorMessage;\n\n// Truncate stack trace\nconst truncatedStack = errorStack.length > 300\n  ? errorStack.substring(0, 300) + '...'\n  : errorStack;\n\n// Build mention text\nconst mentionText = config.mentionOnError ? `${config.mentionOnError} ` : '';\n\nreturn {\n  json: {\n    workflowName,\n    workflowId,\n    executionId,\n    executionUrl,\n    errorMessage: truncatedMessage,\n    errorNode,\n    errorNodeType,\n    errorTimestamp: formattedTime,\n    errorStack: truncatedStack,\n    environment: config.environment,\n    slackChannel: config.slackChannel,\n    mentionText\n  }\n};"
+      },
+      "id": "ad7fb216-932c-4586-bca8-11dcdbc404cb",
+      "name": "Extract Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0ABWP1UGDP",
+          "mode": "id"
+        },
+        "text": "={{ $('Error Trigger').item.json.workflow.name }}\n{{ $('Error Trigger').item.json.execution.error.functionality}}\n{{ $json.mentionText }}\n{{ $json.errorMessage }}\n\n---\n{{ $json.executionUrl }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": true
+        }
+      },
+      "id": "a762dc9a-9680-4959-b024-74d6c6f26e12",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        288
+      ],
+      "webhookId": "b1e3f6de-cc2d-4120-aeeb-8a0dfafe0d52",
+      "credentials": {
+        "slackApi": {
+          "id": "WMCsgpXbztYUJzAv",
+          "name": "EHQ Bot Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Error Workflow - Slack Notifier\n\nThis workflow catches errors from other workflows and sends formatted alerts to Slack.\n\n### Setup\n\n1. **Configure Slack credentials** in the \"Send Slack Alert\" node\n2. **Update Configuration node**:\n   - `slackChannel`: Channel name (e.g., `#n8n-alerts`)\n   - `mentionOnError`: Optional mention (e.g., `@channel`, `<@U12345>`)\n   - `n8nBaseUrl`: Your n8n instance URL\n   - `environment`: Label for alerts (production, staging)\n\n3. **Link to other workflows**:\n   - Open the workflow you want to monitor\n   - Go to Settings → Error Workflow\n   - Select this workflow\n\n### Alert Contents\n\n- Workflow name that failed\n- Node that caused the error\n- Error message (truncated if long)\n- Timestamp (UTC)\n- Direct link to failed execution\n- Environment label\n\n### Note\n\nThis workflow will only trigger when another workflow fails AND that workflow has this set as its Error Workflow.",
+        "height": 540,
+        "width": 700
+      },
+      "id": "37319e18-9761-4085-9014-1edb94184a9a",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error Trigger\nCatches failures from linked workflows",
+        "height": 180,
+        "width": 200,
+        "color": 2
+      },
+      "id": "e1b26cc8-5d98-490a-8445-a2062b621831",
+      "name": "Sticky Note - Trigger",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Configuration\nSlack channel & settings",
+        "height": 180,
+        "width": 200,
+        "color": 5
+      },
+      "id": "5cece6d2-161a-45ed-8923-ed4ae6e1a98d",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        176,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Extract Details\nFormat error info",
+        "height": 180,
+        "width": 200,
+        "color": 7
+      },
+      "id": "1acdf169-f34f-4f26-947a-3b059614d5a4",
+      "name": "Sticky Note - Extract",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        400,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Send Alert\nPost to Slack",
+        "height": 180,
+        "width": 200,
+        "color": 3
+      },
+      "id": "7a06eada-eaa1-4dc1-86c8-9f5d9c0a30f8",
+      "name": "Sticky Note - Slack",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        624,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Details": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

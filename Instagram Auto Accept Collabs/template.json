@@ -1,0 +1,677 @@
+{
+  "name": "Instagram Auto Accept Collabs",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-auto-accept",
+              "name": "autoAccept",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "config-filter-usernames",
+              "name": "filterUsernames",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "config-datatable-id",
+              "name": "dataTableId",
+              "value": "YOUR_DATA_TABLE_ID",
+              "type": "string"
+            },
+            {
+              "id": "config-wait-seconds",
+              "name": "waitBetweenRequests",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-node-001",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Configure:\n- autoAccept: true = accept all, false = decline all\n- filterUsernames: Comma-separated usernames to whitelist (empty = accept all)\n- dataTableId: n8n Data Table ID for tracking processed invites\n- waitBetweenRequests: Seconds to wait between API calls"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v22.0/me/accounts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"fields\": \"id,name,instagram_business_account\"\n}",
+        "options": {}
+      },
+      "id": "get-pages-001",
+      "name": "Get Facebook Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "facebook-graph-api",
+          "name": "Facebook Graph API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the Instagram Business Account ID from Facebook Pages\nconst pages = $input.first().json.data || [];\n\n// Find the first page with an Instagram Business Account linked\nconst pageWithInstagram = pages.find(page => page.instagram_business_account?.id);\n\nif (!pageWithInstagram) {\n  throw new Error('No Instagram Business Account found linked to your Facebook Pages. Make sure your Instagram account is connected to a Facebook Page.');\n}\n\nreturn {\n  json: {\n    pageId: pageWithInstagram.id,\n    pageName: pageWithInstagram.name,\n    igUserId: pageWithInstagram.instagram_business_account.id\n  }\n};"
+      },
+      "id": "extract-ig-id-001",
+      "name": "Extract Instagram Account ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v22.0/{{ $json.igUserId }}/collaboration_invites",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fetch-invites-001",
+      "name": "Fetch Collaboration Invites",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "facebook-graph-api",
+          "name": "Facebook Graph API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "check-has-invites",
+              "leftValue": "={{ $json.data?.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-invites-001",
+      "name": "Has Pending Invites?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract invite data and prepare for processing\nconst invites = $input.first().json.data || [];\nconst config = $('Configuration').item.json;\nconst igUserId = $('Extract Instagram Account ID').item.json.igUserId;\n\n// Parse whitelist if provided\nconst whitelist = config.filterUsernames\n  ? config.filterUsernames.split(',').map(u => u.trim().toLowerCase()).filter(u => u)\n  : [];\n\n// Process each invite\nreturn invites.map(invite => {\n  // Determine action based on config and whitelist\n  let action = config.autoAccept ? 'accept' : 'decline';\n  \n  // If whitelist exists, only accept whitelisted users\n  if (whitelist.length > 0 && config.autoAccept) {\n    const inviterUsername = (invite.owner?.username || invite.from?.username || '').toLowerCase();\n    if (!whitelist.includes(inviterUsername)) {\n      action = 'decline';\n    }\n  }\n  \n  return {\n    json: {\n      mediaId: invite.id || invite.media_id,\n      inviterUsername: invite.owner?.username || invite.from?.username || 'unknown',\n      inviterId: invite.owner?.id || invite.from?.id || '',\n      mediaType: invite.media_type || 'unknown',\n      caption: invite.caption?.substring(0, 100) || '',\n      permalink: invite.permalink || '',\n      timestamp: invite.timestamp || new Date().toISOString(),\n      action: action,\n      igUserId: igUserId\n    }\n  };\n});"
+      },
+      "id": "extract-invites-001",
+      "name": "Extract Invite Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "loop-invites-001",
+      "name": "Loop Over Invites",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.dataTableId }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mediaId",
+              "keyValue": "={{ $json.mediaId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-processed-001",
+      "name": "Check If Already Processed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        180
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "not-processed",
+              "leftValue": "={{ $json.mediaId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-not-processed-001",
+      "name": "Not Yet Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $('Loop Over Invites').item.json.igUserId }}/collaboration_invites",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"media_id\": \"{{ $('Loop Over Invites').item.json.mediaId }}\",\n  \"action\": \"{{ $('Loop Over Invites').item.json.action }}\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "accept-invite-001",
+      "name": "Accept/Decline Invite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        60
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "facebook-graph-api",
+          "name": "Facebook Graph API"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Configuration').item.json.dataTableId }}"
+        },
+        "columns": {
+          "value": {
+            "mediaId": "={{ $('Loop Over Invites').item.json.mediaId }}",
+            "inviterUsername": "={{ $('Loop Over Invites').item.json.inviterUsername }}",
+            "action": "={{ $('Loop Over Invites').item.json.action }}",
+            "processedAt": "={{ $now.toISO() }}",
+            "success": "={{ $json.success === true || $json.success === 'true' ? 'true' : ($json.error ? 'false' : 'true') }}",
+            "response": "={{ JSON.stringify($json).substring(0, 500) }}"
+          },
+          "schema": [
+            {
+              "id": "mediaId",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": true,
+              "displayName": "mediaId",
+              "defaultMatch": true
+            },
+            {
+              "id": "inviterUsername",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "inviterUsername",
+              "defaultMatch": false
+            },
+            {
+              "id": "action",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "action",
+              "defaultMatch": false
+            },
+            {
+              "id": "processedAt",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "processedAt",
+              "defaultMatch": false
+            },
+            {
+              "id": "success",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "success",
+              "defaultMatch": false
+            },
+            {
+              "id": "response",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "response",
+              "defaultMatch": false
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "mediaId"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "store-result-001",
+      "name": "Store Processed Invite",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "unit": "seconds",
+        "amount": "={{ $('Configuration').item.json.waitBetweenRequests }}"
+      },
+      "id": "wait-001",
+      "name": "Wait Between Requests",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        60
+      ],
+      "webhookId": "collab-wait-webhook"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "noop-no-invites-001",
+      "name": "No Pending Invites",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "noop-already-processed-001",
+      "name": "Already Processed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "width": 900,
+        "height": 560,
+        "content": "## Instagram Auto Accept Collabs\n\nAutomatically accepts (or declines) collaboration invites on Instagram posts.\n\n### Requirements\n- Instagram Business or Creator account **linked to a Facebook Page**\n- Facebook Developer App with **Facebook Login for Business**\n- Required permissions: `instagram_basic`, `pages_show_list`, `pages_read_engagement`\n\n### Authentication Setup\nThis workflow uses **Facebook Graph API** credentials (NOT Instagram Bearer Token):\n1. In n8n, create a **Facebook Graph API** credential\n2. Complete the OAuth2 flow to authorize\n3. Make sure your Instagram account is connected to a Facebook Page\n\n### How It Works\n1. Gets your Facebook Pages and finds the linked Instagram Business Account\n2. Fetches pending collaboration invites from Instagram API\n3. For each invite, checks if already processed\n4. Accepts or declines based on configuration\n5. Stores result in Data Table for tracking\n\n### Setup\n1. **Configure Facebook Graph API credentials** in all HTTP Request nodes\n2. **Create Data Table** from the \"Check If Already Processed\" node\n   - Fields: `mediaId` (primary), `inviterUsername`, `action`, `processedAt`, `success`, `response`\n3. **Update Configuration node** with your Data Table ID\n\n### API Reference\n- [Collaboration Invites API](https://developers.facebook.com/docs/instagram-platform/changelog/) (Dec 3, 2025)"
+      },
+      "id": "sticky-instructions-001",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "color": 5,
+        "width": 260,
+        "height": 220,
+        "content": "## Configuration"
+      },
+      "id": "sticky-config-001",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "color": 6,
+        "width": 680,
+        "height": 220,
+        "content": "## Get Instagram Account via Facebook Page"
+      },
+      "id": "sticky-fetch-001",
+      "name": "Sticky Note - Fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "color": 7,
+        "width": 760,
+        "height": 360,
+        "content": "## Process Each Invite"
+      },
+      "id": "sticky-process-001",
+      "name": "Sticky Note - Process",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "color": 3,
+        "width": 700,
+        "height": 360,
+        "content": "## Accept/Decline & Store"
+      },
+      "id": "sticky-action-001",
+      "name": "Sticky Note - Action",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1940,
+        -40
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get Facebook Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Facebook Pages": {
+      "main": [
+        [
+          {
+            "node": "Extract Instagram Account ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Instagram Account ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Collaboration Invites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Collaboration Invites": {
+      "main": [
+        [
+          {
+            "node": "Has Pending Invites?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Pending Invites?": {
+      "main": [
+        [
+          {
+            "node": "Extract Invite Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Pending Invites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invite Details": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Invites": {
+      "main": [
+        [
+          {
+            "node": "Check If Already Processed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Check If Already Processed": {
+      "main": [
+        [
+          {
+            "node": "Not Yet Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not Yet Processed?": {
+      "main": [
+        [
+          {
+            "node": "Accept/Decline Invite",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept/Decline Invite": {
+      "main": [
+        [
+          {
+            "node": "Store Processed Invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Processed Invite": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Requests": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Processed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
