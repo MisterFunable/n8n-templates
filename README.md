@@ -43,11 +43,12 @@ A curated collection of n8n automation templates for social media management, Yo
 | [YouTube Featured Channels Updater](./YouTube%20Featured%20Channels%20Updater) | Update featured channels section on YouTube home tab | ✅ | - |
 | [YouTube Channel Subscriber](./YouTube%20Channel%20Subscriber) | Bulk subscribe to a list of channels with rate limiting | ✅ | - |
 
-### Analytics & Tracking
+### Analytics, Tracking & Backup
 
 | Template | Description | Tested | n8n.io |
 |----------|-------------|--------|--------|
 | [Instagram Account Information Tracker](./Instagram%20Account%20Information%20Tracker) | Track Instagram metrics with n8n Data Tables or Airtable backend | ⏳ | - |
+| [Instagram Video Backup to Google Drive](./Instagram%20Video%20Backup%20to%20Google%20Drive) | Automated backup of Instagram videos with searchable JSON metadata catalog | ⏳ | - |
 
 ### Content Automation Systems
 
@@ -161,6 +162,7 @@ Explore my n8n guides on Medium for in-depth tutorials:
 Several templates are marked ⏳ and need end-to-end testing:
 - Trend Reshare System
 - Instagram Account Information Tracker
+- Instagram Video Backup to Google Drive
 - Instagram Auto Accept Collabs
 - ADR Researcher
 - Web Research Social Links Finder

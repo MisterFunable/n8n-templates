@@ -1,0 +1,585 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## YouTube Video Re-Upload (Recovery)\n\nRestores backed-up YouTube videos from Google Drive using the metadata JSON.\nUse this when a YouTube account is deleted or terminated.\n\n### How It Works\n1. Reads `youtube-backup-metadata.json` from your Drive backup folder\n2. For each video entry: downloads the video + thumbnail from Drive\n3. Uploads the video to YouTube with the original title, description, tags, and category\n4. Sets the original thumbnail\n\n### Prerequisites\n- Run **template.json** (backup) at least once so the metadata JSON + files exist in Drive\n- YouTube OAuth2 credential (on the TARGET account you want to restore to)\n- Google Drive OAuth2 credential (same one used for backup)\n\n### Configuration\n- `googleDriveFolderId`: same folder used for backup\n- `metadataFileName`: same filename used for backup (default: youtube-backup-metadata.json)\n- `targetChannelId`: the YouTube channel ID to upload to\n\n### Notes\n- This is a MANUAL trigger only — recovery is intentional\n- Videos upload with original metadata but will get NEW video IDs\n- Thumbnails are set after upload\n- Skips any video that fails silently (logged in console) so it doesn't block the rest",
+        "height": 1050,
+        "width": 860
+      },
+      "id": "aa111111-1111-1111-1111-000000000001",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [31500, 6800]
+    },
+    {
+      "parameters": {
+        "content": "## Load Backup",
+        "height": 280,
+        "width": 900,
+        "color": 6
+      },
+      "id": "aa111111-1111-1111-1111-000000000002",
+      "name": "Load Backup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [32600, 7600]
+    },
+    {
+      "parameters": {
+        "content": "## Re-Upload Loop\n\nDownloads video + thumbnail from Drive, uploads to YouTube, sets thumbnail.",
+        "height": 280,
+        "width": 3400,
+        "color": 7
+      },
+      "id": "aa111111-1111-1111-1111-000000000003",
+      "name": "Re-Upload Loop",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [33700, 7600]
+    },
+    {
+      "parameters": {},
+      "id": "aa222222-2222-2222-2222-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [32800, 7850]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "drive-folder",
+              "name": "googleDriveFolderId",
+              "value": "YOUR_FOLDER_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "meta-file",
+              "name": "metadataFileName",
+              "value": "youtube-backup-metadata.json",
+              "type": "string"
+            },
+            {
+              "id": "wait-secs",
+              "name": "waitBetweenUploads",
+              "value": 5,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aa222222-2222-2222-2222-000000000002",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [33080, 7850]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name='{{ $('Configuration').item.json.metadataFileName }}' and '{{ $('Configuration').item.json.googleDriveFolderId }}' in parents and trashed=false"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name)"
+            },
+            {
+              "name": "maxResults",
+              "value": "1"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime desc"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aa222222-2222-2222-2222-000000000003",
+      "name": "Find Metadata File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [33360, 7850],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-cred-id",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.files[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "media"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "aa222222-2222-2222-2222-000000000004",
+      "name": "Download Metadata JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [33640, 7850],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-cred-id",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const metadata = $input.item.json;\nconst videos = metadata.videos || [];\nconsole.log('Loaded metadata with', videos.length, 'videos');\nconsole.log('Last updated:', metadata.lastUpdated);\nreturn { json: { videos } };"
+      },
+      "id": "aa222222-2222-2222-2222-000000000005",
+      "name": "Parse Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [33920, 7850]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "videos",
+        "options": {}
+      },
+      "id": "aa222222-2222-2222-2222-000000000006",
+      "name": "Split Out Videos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [34200, 7850]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "aa222222-2222-2222-2222-000000000007",
+      "name": "Loop Over Videos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [34480, 7850]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.videoDriveFileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "media"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "aa222222-2222-2222-2222-000000000008",
+      "name": "Download Video from Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [34900, 7850],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-cred-id",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/upload/youtube/v3/videos",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "uploadType",
+              "value": "resumable"
+            },
+            {
+              "name": "part",
+              "value": "snippet,status"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "snippet",
+              "value": "={{ { title: $('Loop Over Videos').item.json.title, description: $('Loop Over Videos').item.json.description, tags: $('Loop Over Videos').item.json.tags ? $('Loop Over Videos').item.json.tags.split(', ') : [], categoryId: $('Loop Over Videos').item.json.categoryId } }}"
+            },
+            {
+              "name": "status",
+              "value": "={{ { privacyStatus: 'private' } }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "includeHeaders": true
+            }
+          }
+        }
+      },
+      "id": "aa222222-2222-2222-2222-000000000009",
+      "name": "Initiate Video Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [35180, 7850],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "youtube-bearer-cred-id",
+          "name": "YouTube Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.item.json.headers || {};\nconst uploadUrl = headers.location || headers.Location;\nif (!uploadUrl) {\n  console.log('No Location header in response. Headers:', JSON.stringify(headers));\n  return { json: { uploadUrl: '', error: true } };\n}\nconsole.log('Got resumable upload URL');\nreturn { json: { uploadUrl } };"
+      },
+      "id": "aa333333-3333-3333-3333-000000000001",
+      "name": "Get Upload URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [35460, 7850]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.uploadUrl }}",
+        "method": "PUT",
+        "options": {
+          "request": {
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "video/mp4"
+              }
+            ]
+          }
+        }
+      },
+      "id": "aa333333-3333-3333-3333-000000000002",
+      "name": "Upload Video Binary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [35740, 7850],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Configuration').item.json.waitBetweenUploads }}"
+      },
+      "id": "aa222222-2222-2222-2222-000000000010",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [35460, 7850],
+      "webhookId": "wait-webhook-reupload"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Loop Over Videos').item.json.thumbnailDriveFileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "media"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "aa222222-2222-2222-2222-000000000011",
+      "name": "Download Thumbnail from Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [35740, 7850],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google-drive-cred-id",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/upload/youtube/v3/thumbnails/set",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "videoId",
+              "value": "={{ $('Upload Video Binary').item.json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "request": {
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "image/jpeg"
+              }
+            ]
+          }
+        }
+      },
+      "id": "aa222222-2222-2222-2222-000000000012",
+      "name": "Set Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [36300, 7850],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "youtube-bearer-cred-id",
+          "name": "YouTube Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "aa222222-2222-2222-2222-000000000013",
+      "name": "End Loop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [36300, 7850]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Find Metadata File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Metadata File": {
+      "main": [
+        [
+          {
+            "node": "Download Metadata JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Metadata JSON": {
+      "main": [
+        [
+          {
+            "node": "Parse Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Metadata": {
+      "main": [
+        [
+          {
+            "node": "Split Out Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Videos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Videos": {
+      "main": [
+        [
+          {
+            "node": "End Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Video from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video from Drive": {
+      "main": [
+        [
+          {
+            "node": "Initiate Video Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initiate Video Upload": {
+      "main": [
+        [
+          {
+            "node": "Get Upload URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Upload URL": {
+      "main": [
+        [
+          {
+            "node": "Upload Video Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Video Binary": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Download Thumbnail from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Thumbnail from Drive": {
+      "main": [
+        [
+          {
+            "node": "Set Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "End Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "End Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": ""
+  }
+}

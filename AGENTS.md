@@ -51,6 +51,235 @@ WorkflowName/
 
 ## n8n Template Best Practices
 
+### Integration Nodes vs HTTP Request Nodes
+
+**CRITICAL RULE: Always prefer native integration nodes over HTTP Request nodes unless absolutely necessary.**
+
+**Use Integration Nodes When:**
+- ✅ An n8n integration exists for the service (e.g., Twitter, YouTube, Google Sheets)
+- ✅ The integration supports the operation you need
+- ✅ You want automatic authentication handling
+- ✅ You want built-in error handling and retry logic
+- ✅ You want protection against API changes (n8n updates integrations)
+
+**Only Use HTTP Request Nodes When:**
+- ❌ No n8n integration exists for the service
+- ❌ You need to access a custom/internal API
+- ❌ The integration doesn't support a specific endpoint you need
+- ❌ You're using a beta/experimental API endpoint
+- ❌ You need very specific control over headers, body format, or authentication flow
+
+**Why Integration Nodes Are Better:**
+1. **Maintained by n8n** - Automatic updates when APIs change
+2. **Better error messages** - User-friendly error descriptions
+3. **Credential management** - Pre-built OAuth flows and credential types
+4. **Rate limiting** - Built-in throttling and retry logic
+5. **Type safety** - Validated inputs prevent common mistakes
+6. **Documentation** - In-app help and examples
+7. **Community support** - More users = more solved issues
+
+**Common Mistakes:**
+```javascript
+// ❌ BAD: Using HTTP Request for Twitter when integration exists
+HTTP Request → POST https://api.twitter.com/2/tweets
+
+// ✅ GOOD: Using Twitter integration node
+Twitter → Create Tweet
+```
+
+**When HTTP Request Is Necessary:**
+```javascript
+// ✅ ACCEPTABLE: Custom endpoint not in integration
+HTTP Request → POST https://api.twitter.com/2/media/upload  // Media upload not in Twitter node
+
+// ✅ ACCEPTABLE: Internal/custom API
+HTTP Request → POST https://internal-company-api.com/endpoint
+
+// ✅ ACCEPTABLE: Beta endpoint
+HTTP Request → POST https://api.example.com/v2/beta/new-feature
+```
+
+### n8n Data Table Node Configuration
+
+**CRITICAL: When using Data Table nodes, always use `mode: "list"` instead of `mode: "name"`.**
+
+**Issue with `mode: "name"`:**
+- Hides the `columnToMatchOn` and `valueToMatchOn` fields in n8n UI
+- Users cannot see or edit the match conditions
+- Causes confusion when importing templates
+
+**Correct Configuration:**
+```json
+{
+  "operation": "get",
+  "dataTableId": {
+    "__rl": true,
+    "value": "Instagram Video Backups",
+    "mode": "list",
+    "cachedResultName": "Instagram Video Backups"
+  },
+  "filters": {
+    "conditions": [
+      {
+        "keyName": "postId",
+        "keyValue": "={{ $json.id }}"
+      }
+    ]
+  }
+}
+```
+
+**Incorrect Configuration (DO NOT USE):**
+```json
+{
+  "operation": "get",
+  "dataTableId": {
+    "__rl": true,
+    "value": "Instagram Video Backups",
+    "mode": "name"  // ❌ WRONG - hides filter fields
+  },
+  "columnToMatchOn": "postId",  // ❌ Hidden in UI
+  "valueToMatchOn": "={{ $json.id }}"  // ❌ Hidden in UI
+}
+```
+
+**Checking Empty Results:**
+When Data Table returns no results with `alwaysOutputData: true`, check using:
+```json
+{
+  "leftValue": "={{ $('Check If Already Backed Up').all().length }}",
+  "rightValue": "0",
+  "operator": {
+    "type": "number",
+    "operation": "equals"
+  }
+}
+```
+
+**Do NOT use:**
+```json
+// ❌ WRONG - unreliable with empty results
+{
+  "leftValue": "={{ $('Data Table').item.json.postId }}",
+  "operator": "isEmpty"
+}
+```
+
+### Loop Over Items Requirement
+
+**CRITICAL: When processing multiple items from Split Out or array data, always add explicit loop handling.**
+
+n8n's Split Out node creates individual items, but without proper loop handling, only the first item may be processed.
+
+**Correct Pattern for Batch Processing:**
+```
+Fetch Data → Split Out Items → Filter → Loop Over Items → [Process Each Item] → Aggregate Results
+```
+
+**Use Loop Over Items when:**
+- Processing multiple API results
+- Downloading/uploading multiple files
+- Performing operations that need to happen sequentially
+- Aggregating results from multiple items
+
+**Example:**
+```json
+// After Split Out and Filter nodes, add Loop Over Items
+{
+  "type": "n8n-nodes-base.splitInBatches",
+  "parameters": {
+    "batchSize": 1,
+    "options": {}
+  }
+}
+```
+
+**Migration Strategy:**
+If you find yourself using HTTP Request for a service that has an integration:
+1. Check the integration documentation first
+2. Try the integration node with all available parameters
+3. Only fall back to HTTP Request if truly necessary
+4. Document WHY HTTP Request was required in a Sticky Note
+
+### Workflow Refinement Tips
+
+**For Best Results and Production-Ready Workflows:**
+
+1. **Use Descriptive Names Everywhere**
+   - Node names should explain what they do: "Fetch Latest Instagram Posts" not "HTTP Request 1"
+   - Credential names should be generic: "YouTube Account" not "john.doe@gmail.com"
+   - Data Table names should be clear: "Instagram to Twitter Posts" not "data_table_1"
+
+2. **Centralize Configuration**
+   - Always use a Configuration node (Set node) at the workflow start
+   - Store ALL settings in one JSON object: API limits, toggles, IDs, URLs
+   - Reference with `{{ $('Configuration').item.json.settingName }}`
+   - Makes workflows portable and easy to modify
+
+3. **Add Visual Documentation**
+   - Use Sticky Notes to explain each section
+   - Color-code by purpose: Config (purple), Fetch (blue), Process (yellow), Output (green), Error (red)
+   - Group related nodes together visually
+   - Include a large Instructions sticky note at the top
+
+4. **Handle Errors Gracefully**
+   - Set `alwaysOutputData: true` on nodes that might return empty results
+   - Use `onError: "continueRegularOutput"` for non-critical operations
+   - Add IF nodes to check for error conditions before proceeding
+   - Include fallback paths or default values
+
+5. **Implement Proper Deduplication**
+   - Use Data Tables to track processed items (by ID, not timestamp)
+   - Check BEFORE processing expensive operations (API calls, downloads)
+   - Use meaningful field names: `postId`, `videoId`, `tweetId`
+   - Include metadata: `processedAt`, `status`, `errorMessage`
+
+6. **Respect Rate Limits**
+   - Add Wait nodes between API calls (2-15 seconds typical)
+   - Use Split In Batches for bulk operations
+   - Make wait time configurable via Configuration node
+   - Document API limits in sticky notes and README
+
+7. **Test Edge Cases**
+   - Empty results (no posts, no videos)
+   - Missing fields (optional API fields)
+   - API errors (rate limits, authentication failures)
+   - Malformed data (unexpected media types, missing captions)
+   - Large datasets (test with 100+ items if applicable)
+
+8. **Optimize for Performance**
+   - Limit API calls to only necessary data
+   - Use field filters in API requests: `fields=id,title,url` not all fields
+   - Cache expensive operations when possible
+   - Process in batches for large datasets
+   - Avoid nested loops unless absolutely necessary
+
+9. **Make It Portable**
+   - Remove `pinData` before sharing/publishing
+   - Remove or anonymize `instanceId`
+   - Use generic credential names
+   - Don't hardcode user-specific IDs (channel IDs, account IDs)
+   - Put user-specific values in Configuration node
+
+10. **Version Your Workflows**
+    - Keep `template.json` as stable version
+    - Create `template-v2.json` for improvements
+    - Document changes in README or CHANGELOG
+    - Consider creating `-enhanced` or `-variant` versions for different approaches
+
+**Quality Checklist Before Sharing:**
+- [ ] All nodes have descriptive names
+- [ ] Configuration node exists with all settings
+- [ ] Using integration nodes instead of HTTP where possible
+- [ ] Sticky notes explain each section
+- [ ] Error handling on critical operations
+- [ ] Deduplication implemented correctly
+- [ ] Rate limiting in place
+- [ ] No hardcoded credentials or personal data
+- [ ] README with setup instructions
+- [ ] Tested with real data
+- [ ] Works on latest n8n version
+
 ### Node Guidelines
 
 - **Target ~15 nodes per single workflow** for maintainability

@@ -1,0 +1,129 @@
+{
+  "name": "Error Workflow - Slack Notifier (Simple)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger-id",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-slack-channel",
+              "name": "slackChannel",
+              "value": "#n8n-alerts",
+              "type": "string"
+            },
+            {
+              "id": "config-mention",
+              "name": "mention",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "config-n8n-url",
+              "name": "n8nBaseUrl",
+              "value": "https://your-n8n-instance.com",
+              "type": "string"
+            },
+            {
+              "id": "config-env",
+              "name": "environment",
+              "value": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-node-id",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0ABWP1UGDP",
+          "mode": "id"
+        },
+        "messageType": "text",
+        "text": "=🚨 *Workflow Error Alert*\n\n*Workflow:* {{ $('Error Trigger').item.json.workflow.name || 'Unknown' }}\n*Environment:* {{ $('Configuration').item.json.environment }}\n*Failed Node:* {{ $('Error Trigger').item.json.execution.lastNodeExecuted || 'Unknown' }}\n*Execution Mode:* {{ $('Error Trigger').item.json.execution.mode || 'unknown' }}\n\n*Error Message:*\n```\n{{ $('Error Trigger').item.json.execution.error.message || 'Unknown error' }}\n```\n\n<{{ $('Configuration').item.json.n8nBaseUrl }}/workflow/{{ $('Error Trigger').item.json.workflow.id }}/executions/{{ $('Error Trigger').item.json.execution.id }}|View Failed Execution>\n\n_Execution ID: {{ $('Error Trigger').item.json.execution.id }} | {{ $now.format('MMM d, yyyy h:mm a') }} UTC_",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "slack-node-id",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Error Workflow - Slack Notifier (Simple)\n\n**Simplified version** that uses direct error data from Error Trigger without processing.\n\n### Setup\n\n1. **Configure Slack credentials** in \"Send Slack Alert\" node\n2. **Update Configuration node**:\n   - `slackChannel`: Channel (e.g., `#n8n-alerts`)\n   - `mention`: Optional mention (e.g., `@channel`)\n   - `n8nBaseUrl`: Your n8n instance URL\n   - `environment`: production/staging\n\n3. **Link to workflows**:\n   - Open workflow to monitor\n   - Settings → Error Workflow\n   - Select this workflow\n\n### What's Different\n\nThis version directly uses Error Trigger data instead of extracting via Code node:\n- More reliable\n- Shows actual error information\n- No \"Unknown\" values\n- Simpler to debug\n\n### Alert Shows\n- Workflow name\n- Failed node name  \n- Error message\n- Execution link\n- Timestamp",
+        "height": 540,
+        "width": 700
+      },
+      "id": "sticky-instructions",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

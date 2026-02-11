@@ -10,6 +10,7 @@ This is a collection of n8n workflow automation templates for social media cross
 - n8n (workflow automation platform)
 - Instagram Graph API (Meta)
 - YouTube Data API v3 (Google)
+- Google Drive API (Google)
 - Twitter/X API v2
 - Google Gemini AI
 - OpenAI GPT-4o
@@ -36,8 +37,9 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
 - YouTube Featured Channels Updater
 - YouTube Channel Subscriber
 
-**Analytics & Tracking:**
+**Analytics, Tracking & Backup:**
 - Instagram Account Information Tracker
+- Instagram Video Backup to Google Drive
 
 **Content Automation Systems:**
 - Trend Reshare System (multi-workflow)
@@ -172,6 +174,15 @@ Each template is a JSON file containing n8n workflow configuration with nodes, c
     - Includes workflow name, failed node, error message, timestamp
     - Direct link to failed execution for quick debugging
 
+17. **Instagram Video Backup to Google Drive** (`Instagram Video Backup to Google Drive/template.json`)
+    - Automated backup of Instagram videos (VIDEO and REELS) to Google Drive
+    - Downloads videos in maximum quality from Instagram Graph API
+    - Creates searchable JSON metadata catalog stored alongside videos
+    - Deduplication using Data Tables (won't re-download existing backups)
+    - Schedule-triggered (daily midnight)
+    - Metadata includes: captions, hashtags, permalinks, timestamps, Drive file IDs
+    - JSON file lives in Google Drive for portable access without n8n
+
 ## Working with n8n Workflow Templates
 
 ### Template Structure
@@ -209,6 +220,70 @@ n8n templates are JSON files with this structure:
 - **AI Agent**: LLM integration (Google Gemini, OpenAI, Anthropic) for translations, content optimization, and research
 - **Sticky Note**: Documentation and instructions within workflows
 
+### Node Selection Guidelines
+
+**CRITICAL: Always prefer native integration nodes over HTTP Request nodes unless explicitly required.**
+
+When working with APIs in n8n workflows:
+
+1. **First Check for Integration Nodes**
+   - n8n has 400+ integrations (Twitter, YouTube, Instagram, Google Sheets, etc.)
+   - Integration nodes are actively maintained and updated by n8n
+   - They handle authentication, rate limiting, and API changes automatically
+   - Example: Use the **Twitter** node instead of HTTP Request to `api.twitter.com`
+
+2. **Only Use HTTP Request When:**
+   - No n8n integration exists for the service
+   - Accessing a custom/internal API
+   - The integration doesn't support a specific endpoint (e.g., Twitter media upload v1.1)
+   - Using beta/experimental API endpoints
+   - Need specific control over request format
+
+3. **Common Integration Nodes in This Repository:**
+   - **Twitter (n8n-nodes-base.twitter)**: Create tweets, search, like
+   - **YouTube (n8n-nodes-base.youtube)**: Upload videos, update metadata
+   - **Google Sheets (n8n-nodes-base.googleSheets)**: Read/write spreadsheet data
+   - **Airtable (n8n-nodes-base.airtable)**: Database operations
+   - **Instagram**: Use HTTP Request with Meta Graph API (no official n8n integration)
+   - **OpenAI (@n8n/n8n-nodes-langchain.openAi)**: GPT models, DALL-E, embeddings
+
+4. **When HTTP Request Is Necessary in This Repo:**
+   - **Instagram API**: No official n8n integration, must use HTTP Request with Bearer auth
+   - **Twitter Media Upload v1.1**: Integration doesn't support this endpoint, requires HTTP Request with OAuth1
+   - **X API v2 Media Upload**: New endpoint not yet in Twitter integration
+   - **Custom webhooks**: Internal services or one-off integrations
+
+5. **Authentication Comparison:**
+
+| Integration Node | HTTP Request Node |
+|-----------------|-------------------|
+| Pre-built OAuth flows | Manual OAuth configuration |
+| Automatic token refresh | Manual refresh logic needed |
+| Credential validation | No validation |
+| User-friendly setup | Technical setup required |
+
+**Example: Instagram to Twitter Workflow**
+```
+✅ Fetch Instagram Posts: HTTP Request (no Instagram integration)
+  → URL: https://graph.instagram.com/me/media
+  → Auth: Bearer Token
+
+❌ Upload to Twitter: DON'T use HTTP Request if Twitter node supports it
+✅ Upload to Twitter: Use Twitter integration node when possible
+
+⚠️ Upload Media to Twitter: HTTP Request (integration doesn't support v1.1 media upload)
+  → URL: https://upload.twitter.com/1.1/media/upload.json
+  → Auth: OAuth1
+  → Note: Required because Twitter node doesn't expose media upload endpoint
+```
+
+**Best Practices:**
+- Always check n8n documentation for available integrations first
+- Document in Sticky Notes why HTTP Request was chosen over integration
+- Use integration nodes for 80%+ of API interactions
+- Reserve HTTP Request for truly custom needs
+- Keep HTTP Request configurations simple and well-commented
+
 ### Important Patterns
 
 #### Deduplication Pattern
@@ -219,6 +294,60 @@ All workflows use Data Tables to prevent duplicate actions:
 ```
 
 Data Table schema typically has a primary key field (e.g., `postId`, `videoId`).
+
+**CRITICAL: Data Table Configuration**
+
+Always use `mode: "list"` for Data Table nodes, NOT `mode: "name"`:
+
+```json
+// ✅ CORRECT
+{
+  "dataTableId": {
+    "mode": "list",
+    "cachedResultName": "Table Name"
+  },
+  "filters": {
+    "conditions": [{"keyName": "postId", "keyValue": "={{ $json.id }}"}]
+  }
+}
+
+// ❌ WRONG - hides filter fields in UI
+{
+  "dataTableId": {
+    "mode": "name"
+  },
+  "columnToMatchOn": "postId"  // Hidden in n8n UI
+}
+```
+
+**Checking Empty Data Table Results:**
+
+When checking if a Data Table returned no results:
+```javascript
+// ✅ CORRECT - check array length
+{{ $('Data Table Node').all().length }} equals 0
+
+// ❌ WRONG - unreliable
+{{ $('Data Table Node').item.json.postId }} isEmpty
+```
+
+#### Loop Over Items Pattern
+
+**CRITICAL: Always use explicit loops when processing multiple items from Split Out.**
+
+n8n's Split Out creates individual items, but workflows need proper loop handling to process all items:
+
+```
+[Fetch] → [Split Out] → [Filter] → [Loop Over Items] → [Process] → [Aggregate]
+```
+
+Without explicit looping (Split In Batches or similar), only the first item may be processed.
+
+**Implementation:**
+- Use `splitInBatches` node with `batchSize: 1` after Filter
+- Ensures each item is processed sequentially
+- Required for download/upload operations
+- Necessary for proper deduplication checking per item
 
 #### Expression Syntax
 n8n uses `{{ }}` for dynamic values:
@@ -321,6 +450,10 @@ When modifying workflows, these credential types are referenced:
    - Alternative to SerpAPI for Web Research
    - Free tier: 100 searches/day
 
+10. **Google Drive API**: Google OAuth 2.0
+   - Used in Instagram Video Backup to Google Drive
+   - Free tier: 15GB storage, 1,000 requests per 100 seconds
+
 Credentials are stored encrypted in n8n and referenced by ID in workflow nodes.
 
 ## Common Operations
@@ -373,6 +506,181 @@ When debugging systems with multiple workflows:
 - `template-anthropic.json`: Alternative LLM provider version
 - When creating new versions, increment version number in filename
 - Document version differences in README or WHICH-VERSION.md
+
+## Workflow Quality and Refinement
+
+### Production-Ready Workflow Standards
+
+When creating or modifying workflows, follow these quality standards:
+
+**1. Descriptive Naming**
+- **Node Names**: Explain the action, not the node type
+  - ✅ Good: "Fetch Latest Instagram Posts", "Check If Video Already Uploaded"
+  - ❌ Bad: "HTTP Request", "IF", "Code"
+- **Credential Names**: Use generic, professional names
+  - ✅ Good: "YouTube Account", "Instagram Business Account", "Twitter API"
+  - ❌ Bad: "john.doe@gmail.com", "My Personal Insta", "test_creds_2"
+- **Data Tables**: Clear, descriptive table names
+  - ✅ Good: "Instagram to Twitter Posts", "YouTube Video Uploads"
+  - ❌ Bad: "data_table_1", "my_table", "temp"
+
+**2. Configuration Centralization**
+Always start workflows with a **Configuration** node (Set node):
+```json
+{
+  "includeSourceLink": true,
+  "waitTimeoutSeconds": 15,
+  "videoOnly": true,
+  "maxItemsPerRun": 25,
+  "apiEndpoint": "https://api.example.com/v2"
+}
+```
+
+Benefits:
+- Single source of truth for all settings
+- Easy to modify without navigating workflow
+- Portable across environments
+- Self-documenting workflow behavior
+
+**3. Visual Documentation**
+Use Sticky Notes extensively:
+- **Large Instructions Note**: At workflow start, explaining purpose and setup
+- **Section Notes**: Group related nodes with color-coded sticky notes
+- **Color Coding**:
+  - Purple (5): Configuration and setup
+  - Blue (6): Data fetching and input
+  - Yellow (7): Processing and logic
+  - Green (3): Output and final actions
+  - Red (2): Error handling
+- **Why Notes**: Explain non-obvious decisions (e.g., "Using HTTP Request because Twitter integration doesn't support v1.1 media upload")
+
+**4. Error Handling**
+Implement robust error handling:
+- Set `alwaysOutputData: true` on nodes that might return empty results
+- Use `onError: "continueRegularOutput"` for non-critical operations
+- Add IF nodes to validate data before proceeding
+- Include error branches that log failures or notify admins
+- Test error paths (simulate API failures, empty responses, malformed data)
+
+**5. Deduplication Logic**
+Prevent duplicate processing:
+- Use Data Tables or Airtable to track processed items
+- Check BEFORE expensive operations (downloads, API calls, AI processing)
+- Use unique identifiers: `postId`, `videoId`, `tweetId` (not timestamps)
+- Include metadata: `processedAt`, `status`, `errorMessage`, `retryCount`
+- Handle edge cases: What if same item appears twice in API response?
+
+**6. Rate Limiting**
+Respect API limits:
+- Add Wait nodes between API calls (2-15 seconds typical)
+- Use Split In Batches for bulk operations
+- Make wait time configurable via Configuration node
+- Document API limits in Sticky Notes
+- Monitor execution logs for rate limit warnings
+
+**7. AI Agent Workflows**
+When using AI in workflows, use the **AI Agent** node, not just raw API calls:
+
+**✅ CORRECT: Using AI Agent Node**
+```
+[Trigger] → [AI Agent (@n8n/n8n-nodes-langchain.lmAgent)]
+          → Connect tools: [Web Search], [HTTP Request]
+          → Maintains conversation memory
+          → Handles tool calling automatically
+```
+
+**❌ INCORRECT: Using HTTP Request to OpenAI API**
+```
+[Trigger] → [HTTP Request to api.openai.com]
+          → Manual prompt building
+          → No memory
+          → No tool integration
+```
+
+**Why AI Agent Node Is Required:**
+- Conversation memory management
+- Automatic tool calling and result processing
+- Structured output parsing
+- Error handling for AI failures
+- Token management and optimization
+- Support for multiple LLM providers
+
+**AI Agent Best Practices:**
+- Use structured prompts with clear instructions
+- Connect relevant tools (Web Search, Calculator, HTTP Request)
+- Set appropriate memory window (5-10 messages typical)
+- Request JSON output for structured data
+- Include examples in system prompt for consistent results
+- Test with multiple inputs to ensure reliability
+
+**8. Testing Checklist**
+Before marking a workflow as complete:
+- [ ] Test with real API credentials
+- [ ] Test with empty results (no posts, no videos)
+- [ ] Test with missing/optional fields
+- [ ] Test error scenarios (rate limits, auth failures)
+- [ ] Test with large datasets (100+ items if applicable)
+- [ ] Verify deduplication works (run twice, should skip duplicates)
+- [ ] Check rate limiting (doesn't hit API limits)
+- [ ] Confirm configuration node works (change settings and verify behavior)
+- [ ] Test both backends if supporting n8n + Airtable
+- [ ] Verify no hardcoded credentials or personal data
+
+**9. Performance Optimization**
+- Limit API calls to only necessary data
+  - Use field filters: `fields=id,title,url` instead of fetching all fields
+  - Use limit parameters: `limit=25` instead of fetching all items
+- Cache expensive operations when possible
+- Process in batches for large datasets (use Split In Batches)
+- Avoid nested loops unless absolutely necessary
+- Use Set node to transform data instead of multiple Code nodes
+- Minimize Code node complexity (split into multiple simpler Code nodes if needed)
+
+**10. Portability**
+Make workflows easy to share:
+- Remove `pinData` before publishing (test data clutters workflow)
+- Remove or anonymize `instanceId`
+- Use generic credential names
+- Don't hardcode user-specific IDs (put in Configuration node)
+- Include example values in Configuration node
+- Document credential requirements in README
+- Test import on fresh n8n instance
+
+### Common Quality Issues and Fixes
+
+**Issue: Workflow fails silently**
+- Fix: Add `alwaysOutputData: true` to nodes that might return empty
+- Fix: Add error logging branches
+- Fix: Set up Error Workflow for monitoring
+
+**Issue: Duplicate processing**
+- Fix: Implement Data Table deduplication
+- Fix: Check BEFORE processing, not after
+- Fix: Use unique IDs, not timestamps
+
+**Issue: API rate limits**
+- Fix: Add Wait nodes between calls
+- Fix: Use Split In Batches with delay
+- Fix: Implement exponential backoff in error handling
+
+**Issue: Hardcoded values everywhere**
+- Fix: Create Configuration node with all settings
+- Fix: Reference with `{{ $('Configuration').item.json.settingName }}`
+
+**Issue: No AI memory/tool calling**
+- Fix: Use AI Agent node instead of HTTP Request to AI APIs
+- Fix: Connect tools as separate nodes
+- Fix: Configure memory window appropriately
+
+**Issue: Workflow breaks on API changes**
+- Fix: Use integration nodes instead of HTTP Request when available
+- Fix: Add validation IF nodes to check response structure
+- Fix: Include fallback values for optional fields
+
+**Issue: Poor performance with large datasets**
+- Fix: Use field filters to limit API response size
+- Fix: Process in batches (Split In Batches)
+- Fix: Add limit parameter to API calls
 
 ## Architecture Notes
 

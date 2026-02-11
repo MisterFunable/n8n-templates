@@ -1,0 +1,1184 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        416
+      ],
+      "id": "5a06122c-2aea-458d-b091-ac283d21f227",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"includeSourceLink\": true,\n  \"waitTimeoutSeconds\": 15,\n  \"maxTitleLength\": 100,\n  \"categoryId\": \"24\",\n  \"privacyStatus\": \"public\",\n  \"defaultLanguage\": \"en\",\n  \"useAITags\": true,\n  \"preserveOriginalTitle\": true,\n  \"nsfwKeywords\": [\"nsfw\", \"adult\", \"18+\", \"explicit\", \"onlyfans\", \"spicy\", \"🔞\", \"mature\", \"sensitive\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1232,
+        416
+      ],
+      "id": "ac1e8695-702c-43c3-94c7-1d8db2e7ac7d",
+      "name": "Configuration"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.instagram.com/me/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"25\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1456,
+        416
+      ],
+      "id": "ebf9f778-3b81-4c64-adbd-d79896154c3c",
+      "name": "Fetch Instagram Posts",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngxNKAAR2WN7cqrp",
+          "name": "Bearer Auth Instagram Account Statuenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        416
+      ],
+      "id": "7ecdabd8-51a1-4fc6-85b8-38eea812e4e9",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "video-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "VIDEO"
+            },
+            {
+              "id": "reels-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "REELS"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c54e3dc2-ab11-4a1a-ac40-be260c1bb0f6",
+      "name": "Filter Videos Only",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1904,
+        416
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2128,
+        416
+      ],
+      "id": "052af699-2c72-4654-8060-bd9ab2dd5a5e",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e2VhFzh2KfUPqXvu",
+          "mode": "list",
+          "cachedResultName": "Instagram Smart Filter",
+          "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/e2VhFzh2KfUPqXvu"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "postId",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        480
+      ],
+      "id": "3c94fb9d-37cc-4fa9-857e-c4789dd7fc72",
+      "name": "Check If Already Posted",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "not-exists-check",
+              "leftValue": "={{ $json.postId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2576,
+        480
+      ],
+      "id": "a5848d5f-5034-48cd-8673-e44d1c86dfee",
+      "name": "If Not Posted Yet"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Configuration').item.json.waitTimeoutSeconds }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2800,
+        416
+      ],
+      "id": "2be2f7a0-5f07-4ee1-87a4-d4f72fce1895",
+      "name": "Wait",
+      "webhookId": "instagram-smart-filter-wait"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get configuration\nconst config = $('Configuration').first().json;\nconst includeSourceLink = config.includeSourceLink;\nconst MAX_TITLE_LENGTH = config.maxTitleLength || 100;\n\n// Get post data\nconst caption = $('Loop Over Items').item.json.caption || '';\nconst postId = $('Loop Over Items').item.json.id;\nconst mediaUrl = $('Loop Over Items').item.json.media_url;\nconst permalink = $('Loop Over Items').item.json.permalink;\n\n// Extract hashtags\nconst hashtagRegex = /#[\\w\\u00C0-\\u024F]+/gu;\nconst hashtags = caption.match(hashtagRegex) || [];\n\n// Preserve original title (text before first hashtag)\nconst firstHashtagIndex = caption.indexOf('#');\nlet originalTitle = firstHashtagIndex === -1 \n  ? caption.trim() \n  : caption.substring(0, firstHashtagIndex).trim();\n\nif (!originalTitle && hashtags.length > 0) {\n  originalTitle = hashtags[0].replace('#', '');\n}\n\nif (!originalTitle) {\n  originalTitle = 'Instagram Video';\n}\n\n// Smart truncation for YouTube title\nlet youtubeTitle = originalTitle;\nif (youtubeTitle.length > MAX_TITLE_LENGTH) {\n  youtubeTitle = youtubeTitle.substring(0, MAX_TITLE_LENGTH);\n  const lastSpace = youtubeTitle.lastIndexOf(' ');\n  if (lastSpace > MAX_TITLE_LENGTH * 0.6) {\n    youtubeTitle = youtubeTitle.substring(0, lastSpace);\n  }\n  youtubeTitle = youtubeTitle.trim() + '...';\n}\n\n// Build YouTube description\nlet youtubeDescription = caption;\nif (includeSourceLink) {\n  youtubeDescription += `\\n\\n---\\nOriginally posted on Instagram: ${permalink}`;\n}\n\n// Build Twitter text\nlet twitterText = caption;\nif (includeSourceLink) {\n  const sourceLink = `\\n\\nOriginally posted on Instagram: ${permalink}`;\n  const maxCaptionLength = 280 - sourceLink.length;\n  \n  if (twitterText.length > maxCaptionLength) {\n    twitterText = twitterText.substring(0, maxCaptionLength - 3).trim() + '...';\n  }\n  twitterText += sourceLink;\n} else {\n  if (twitterText.length > 280) {\n    twitterText = twitterText.substring(0, 277).trim() + '...';\n  }\n}\n\nreturn [{\n  json: {\n    postId: postId,\n    originalTitle: originalTitle,\n    youtubeTitle: youtubeTitle,\n    youtubeDescription: youtubeDescription,\n    twitterText: twitterText,\n    mediaUrl: mediaUrl,\n    originalCaption: caption,\n    hashtagCount: hashtags.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3024,
+        416
+      ],
+      "id": "8879521e-ed71-43c9-9abd-c58365fc1bbb",
+      "name": "Process Title and Caption"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3232,
+        704
+      ],
+      "id": "24b9fa78-531d-4668-9edc-1c3e1487c3e0",
+      "name": "Generate Tags with AI",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "AA17xDpfDPBIXegL",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get configuration\nconst config = $('Configuration').first().json;\nconst nsfwKeywords = config.nsfwKeywords || [];\n\n// Get processed data\nconst processedData = $('Process Title and Caption').first().json;\nconst aiResponse = $input.first().json.response || '';\n\n// Parse AI-generated tags\nconst aiTags = aiResponse\n  .split(',') \n  .map(t => t.trim())\n  .filter(t => t.length > 0 && t.length <= 30)\n  .slice(0, 10);\n\n// NSFW Detection\nconst caption = processedData.originalCaption.toLowerCase();\nlet isNSFW = false;\nlet matchedKeyword = '';\n\nfor (const keyword of nsfwKeywords) {\n  if (caption.includes(keyword.toLowerCase())) {\n    isNSFW = true;\n    matchedKeyword = keyword;\n    break;\n  }\n}\n\nconst filterReason = isNSFW \n  ? `NSFW keyword detected: \"${matchedKeyword}\"` \n  : 'Safe content - approved for all platforms';\n\nreturn [{\n  json: {\n    ...processedData,\n    aiGeneratedTags: aiTags.join(','),\n    youtubeTags: aiTags,\n    isNSFW: isNSFW,\n    filterReason: filterReason,\n    wasFiltered: isNSFW\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3472,
+        416
+      ],
+      "id": "d4c89343-54b7-4468-a13b-454b27657732",
+      "name": "NSFW Content Detector"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mediaUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3696,
+        416
+      ],
+      "id": "2919d19f-b93e-4687-8ef8-179481a4e3fa",
+      "name": "Download Video"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "nsfw-check",
+              "leftValue": "={{ $('NSFW Content Detector').item.json.isNSFW }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3920,
+        416
+      ],
+      "id": "feb6ecdf-30f9-4958-bc14-1f3c9d25efea",
+      "name": "Is NSFW Content?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.twitter.com/1.1/media/upload.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4144,
+        512
+      ],
+      "id": "83fc6826-9337-4f84-b1a3-8e7bcd0dbd16",
+      "name": "Upload Media to Twitter (NSFW)",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "Rm6H3keTsAY0galG",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('NSFW Content Detector').item.json.twitterText }}"
+            },
+            {
+              "name": "media",
+              "value": "={{ { \"media_ids\": [$json.media_id_string] } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4368,
+        512
+      ],
+      "id": "55a23ad9-f998-4b20-b782-b82d6f90926e",
+      "name": "Create Tweet (NSFW Only)",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "Rm6H3keTsAY0galG",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "platform-assign",
+              "name": "platform",
+              "type": "string",
+              "value": "twitter"
+            },
+            {
+              "id": "youtube-id-assign",
+              "name": "youtubeId",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "tweet-id-assign",
+              "name": "tweetId",
+              "type": "string",
+              "value": "={{ $json.data.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4592,
+        512
+      ],
+      "id": "f88d043c-f868-4199-a43d-b42bf64237c1",
+      "name": "Set NSFW Result"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('NSFW Content Detector').item.json.youtubeTitle }}",
+        "regionCode": "CL",
+        "categoryId": "={{ $('Configuration').item.json.categoryId }}",
+        "options": {
+          "defaultLanguage": "={{ $('Configuration').item.json.defaultLanguage }}",
+          "description": "={{ $('NSFW Content Detector').item.json.youtubeDescription }}",
+          "embeddable": true,
+          "license": "youtube",
+          "notifySubscribers": true,
+          "privacyStatus": "={{ $('Configuration').item.json.privacyStatus }}",
+          "publicStatsViewable": true,
+          "selfDeclaredMadeForKids": false,
+          "tags": "={{ $('NSFW Content Detector').item.json.youtubeTags.join(',') }}"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        4144,
+        320
+      ],
+      "id": "7452b0ae-5a10-46be-b74b-640298f0476e",
+      "name": "Upload to YouTube (Safe)",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "BKcJDTw1B9sRU5HT",
+          "name": "YouTube Account Statuenable"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.twitter.com/1.1/media/upload.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4368,
+        320
+      ],
+      "id": "ba3eec4a-269e-4e42-8937-952b88a64449",
+      "name": "Upload Media to Twitter (Safe)",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "Rm6H3keTsAY0galG",
+          "name": "X account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('NSFW Content Detector').item.json.twitterText }}"
+            },
+            {
+              "name": "media",
+              "value": "={{ { \"media_ids\": [$json.media_id_string] } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4592,
+        320
+      ],
+      "id": "14baffb5-a2f4-406c-8916-20609d701c86",
+      "name": "Create Tweet (Safe)",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "Rm6H3keTsAY0galG",
+          "name": "X account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        4816,
+        320
+      ],
+      "id": "ef6f85d0-6e96-4d7f-a512-6796210191c7",
+      "name": "Merge Safe Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect results from both platforms (safe content path)\nconst youtubeData = $input.first().json;\nconst twitterData = $input.last().json;\nconst processedData = $('NSFW Content Detector').first().json;\n\nconst youtubeId = youtubeData.id || null;\nconst tweetId = twitterData?.data?.id || null;\n\nlet platform = 'none';\nif (youtubeId && tweetId) {\n  platform = 'both';\n} else if (youtubeId) {\n  platform = 'youtube';\n} else if (tweetId) {\n  platform = 'twitter';\n}\n\nreturn [{\n  json: {\n    platform: platform,\n    youtubeId: youtubeId,\n    tweetId: tweetId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        320
+      ],
+      "id": "24258de7-d178-4e68-8646-c00680adb493",
+      "name": "Prepare Safe Result"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        4816,
+        416
+      ],
+      "id": "ca407134-a922-45ad-b3a2-e00f1e985de3",
+      "name": "Merge All Paths"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final record preparation\nconst detectorData = $('NSFW Content Detector').first().json;\nconst resultData = $input.first().json;\n\nconst uploadedAt = new Date().toISOString();\n\nreturn [{\n  json: {\n    postId: detectorData.postId,\n    youtubeId: resultData.youtubeId || null,\n    tweetId: resultData.tweetId || null,\n    platform: resultData.platform,\n    wasFiltered: detectorData.wasFiltered,\n    filterReason: detectorData.filterReason,\n    aiGeneratedTags: detectorData.aiGeneratedTags,\n    uploadedAt: uploadedAt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        416
+      ],
+      "id": "96909378-9ca6-43fd-8e9e-8c5e80d579d8",
+      "name": "Prepare Final Record"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_DATATABLE_ID",
+          "mode": "list",
+          "cachedResultName": "Instagram Smart Filter"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "postId": "={{ $json.postId }}",
+            "youtubeId": "={{ $json.youtubeId }}",
+            "tweetId": "={{ $json.tweetId }}",
+            "platform": "={{ $json.platform }}",
+            "wasFiltered": "={{ $json.wasFiltered }}",
+            "filterReason": "={{ $json.filterReason }}",
+            "aiGeneratedTags": "={{ $json.aiGeneratedTags }}",
+            "uploadedAt": "={{ $json.uploadedAt }}"
+          },
+          "matchingColumns": [
+            "postId"
+          ],
+          "schema": [
+            {
+              "id": "postId",
+              "displayName": "postId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "youtubeId",
+              "displayName": "youtubeId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tweetId",
+              "displayName": "tweetId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "wasFiltered",
+              "displayName": "wasFiltered",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "filterReason",
+              "displayName": "filterReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "aiGeneratedTags",
+              "displayName": "aiGeneratedTags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "uploadedAt",
+              "displayName": "uploadedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        5264,
+        416
+      ],
+      "id": "ba4dd488-675c-4cf2-a1f1-00a9c0a26784",
+      "name": "Save Smart Filter Record"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-done",
+              "name": "status",
+              "type": "string",
+              "value": "Workflow completed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "70402e76-fdd4-42de-b29f-06231ba40970",
+      "name": "Done",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2128,
+        224
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "## Instagram to Twitter V2 - Smart Filter\n\nAI-powered cross-posting with intelligent NSFW filtering.\n\n### How It Works\n**NSFW Content** → Twitter ONLY (YouTube skipped)\n**Safe Content** → Twitter + YouTube (dual posting)\n\n### Configuration\n```json\n{\n  \"includeSourceLink\": true,\n  \"waitTimeoutSeconds\": 15,\n  \"maxTitleLength\": 100,\n  \"categoryId\": \"24\",\n  \"privacyStatus\": \"public\",\n  \"defaultLanguage\": \"en\",\n  \"useAITags\": true,\n  \"preserveOriginalTitle\": true,\n  \"nsfwKeywords\": [\n    \"nsfw\", \"adult\", \"18+\", \"explicit\",\n    \"onlyfans\", \"spicy\", \"🔞\", \"mature\", \"sensitive\"\n  ]\n}\n```\n\n### NSFW Detection\n- Checks caption for configurable keywords\n- Case-insensitive matching\n- NSFW posts still go to Twitter (not skipped entirely!)\n- YouTube is protected from sensitive content\n\n### AI Features\n- Uses Google Gemini 1.5 Flash (free tier)\n- Generates 5-10 relevant tags automatically\n- Analyzes caption context for better tags\n- Applied to both YouTube and Twitter\n\n### Requirements\n- **Instagram**: Bearer Token\n- **YouTube**: OAuth2 API\n- **Twitter**: OAuth 2.0 API\n- **Google Gemini**: API Key (free tier: 60 req/min)\n- **Data Table**: \"Instagram Smart Filter\"\n  - postId (string)\n  - youtubeId (string)\n  - tweetId (string)\n  - platform (string)\n  - wasFiltered (boolean)\n  - filterReason (string)\n  - aiGeneratedTags (string)\n  - uploadedAt (string)\n\n### Setup Steps\n1. Configure NSFW keywords in Configuration node\n2. Set Instagram Bearer Auth credentials\n3. Set YouTube OAuth2 credentials\n4. Set Twitter OAuth2 credentials\n5. Set Google Gemini API credentials\n6. Create Data Table with 8 fields\n7. Update all Data Table IDs in workflow\n\n### Customizing NSFW Filter\nEdit the `nsfwKeywords` array in Configuration:\n- Add keywords specific to your content\n- Include variations and emojis\n- Case-insensitive matching\n\n### API Quota\n- Gemini: 1 request per post (~100 tokens)\n- YouTube: 50 units per safe post\n- Twitter: No additional cost vs basic posting",
+        "height": 1360,
+        "width": 678
+      },
+      "id": "e3ecf659-a8a3-45ac-92eb-3ead3c439991",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 0. Configuration\nAll settings including NSFW keywords. Customize the filter list here.",
+        "height": 224,
+        "width": 256,
+        "color": 5
+      },
+      "id": "b46df4ac-2fef-473e-adfd-76768002cf58",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1200,
+        272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 1. Fetch & Filter\nGets Instagram posts, filters videos only.",
+        "height": 304,
+        "width": 500,
+        "color": 6
+      },
+      "id": "63fbfc93-7f60-4214-bf28-46070e97f093",
+      "name": "Sticky Note - Fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1424,
+        272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 2. Deduplication\nSkip already posted content.",
+        "height": 384,
+        "width": 292,
+        "color": 7
+      },
+      "id": "ea47dcc3-18e9-4340-98aa-305e695451ac",
+      "name": "Sticky Note - Check",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2320,
+        304
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 3. AI Processing\n- Process title/caption\n- Generate tags with Gemini AI\n- Detect NSFW keywords\n- Prepare data for routing",
+        "height": 304,
+        "width": 692,
+        "color": 4
+      },
+      "id": "a60d60d5-12b7-4a58-9d58-8c5feff3415c",
+      "name": "Sticky Note - AI",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2992,
+        272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 4. Smart Routing\nNSFW → Twitter only\nSafe → Twitter + YouTube",
+        "height": 304,
+        "width": 260
+      },
+      "id": "f0710846-2049-4966-83ed-f1a64824ad8e",
+      "name": "Sticky Note - Route",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3664,
+        272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 5. NSFW Path (Twitter Only)\nPosts NSFW content to Twitter, skips YouTube to keep it brand-safe.",
+        "height": 384,
+        "width": 692,
+        "color": 2
+      },
+      "id": "c8f50806-5336-439b-b8e2-97c46d389a24",
+      "name": "Sticky Note - NSFW",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4112,
+        400
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 6. Safe Path (Both Platforms)\nPosts safe content to YouTube AND Twitter with AI-generated tags.",
+        "height": 384,
+        "width": 948,
+        "color": 3
+      },
+      "id": "2367b026-80c9-4e14-b223-4a9998bae83c",
+      "name": "Sticky Note - Safe",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4112,
+        144
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 7. Merge & Save\nCombines results from both paths, saves comprehensive tracking record.",
+        "height": 304,
+        "width": 468,
+        "color": 7
+      },
+      "id": "cf00354f-5769-47b5-86a7-15f0386ad76a",
+      "name": "Sticky Note - Save",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4784,
+        272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3200,
+        448
+      ],
+      "id": "463ba9ce-55fd-499f-9fa3-2c950d0448e0",
+      "name": "AI Agent"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Instagram Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instagram Posts": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter Videos Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Videos Only": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If Already Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already Posted": {
+      "main": [
+        [
+          {
+            "node": "If Not Posted Yet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Posted Yet": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Process Title and Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Title and Caption": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Tags with AI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NSFW Content Detector": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Is NSFW Content?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is NSFW Content?": {
+      "main": [
+        [
+          {
+            "node": "Upload Media to Twitter (NSFW)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upload to YouTube (Safe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media to Twitter (NSFW)": {
+      "main": [
+        [
+          {
+            "node": "Create Tweet (NSFW Only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tweet (NSFW Only)": {
+      "main": [
+        [
+          {
+            "node": "Set NSFW Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set NSFW Result": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Upload to YouTube (Safe)": {
+      "main": [
+        [
+          {
+            "node": "Upload Media to Twitter (Safe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media to Twitter (Safe)": {
+      "main": [
+        [
+          {
+            "node": "Create Tweet (Safe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tweet (Safe)": {
+      "main": [
+        [
+          {
+            "node": "Merge Safe Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Safe Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Safe Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Safe Result": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Paths": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Record": {
+      "main": [
+        [
+          {
+            "node": "Save Smart Filter Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Smart Filter Record": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "NSFW Content Detector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

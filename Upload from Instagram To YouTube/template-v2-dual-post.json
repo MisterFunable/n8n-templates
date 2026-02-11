@@ -1,0 +1,810 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1376,
+        0
+      ],
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"includeSourceLink\": true,\n  \"waitTimeoutSeconds\": 15,\n  \"maxTitleLength\": 100,\n  \"categoryId\": \"24\",\n  \"privacyStatus\": \"public\",\n  \"defaultLanguage\": \"en\",\n  \"postToYouTube\": true,\n  \"postToTwitter\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1152,
+        0
+      ],
+      "id": "config-node",
+      "name": "Configuration"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.instagram.com/me/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"25\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        0
+      ],
+      "id": "fetch-instagram",
+      "name": "Fetch Instagram Posts",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_YOUR_INSTAGRAM_CREDENTIAL_ID",
+          "name": "Instagram Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        0
+      ],
+      "id": "split-out",
+      "name": "Split Out"
+    },
+    {
+      "id": "filter-videos-only",
+      "name": "Filter Videos Only",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        -480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "video-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "VIDEO"
+            },
+            {
+              "id": "reels-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "REELS"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -256,
+        0
+      ],
+      "id": "loop-over-items",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_DATATABLE_ID",
+          "mode": "list",
+          "cachedResultName": "Instagram Dual Upload"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "postId",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        64
+      ],
+      "id": "check-if-uploaded",
+      "name": "Check If Already Uploaded",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "not-exists-check",
+              "leftValue": "={{ $json.postId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        64
+      ],
+      "id": "if-not-uploaded",
+      "name": "If Not Uploaded Yet"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Configuration').item.json.waitTimeoutSeconds }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "wait-rate-limit",
+      "name": "Wait",
+      "webhookId": "instagram-dual-wait"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get configuration from the Configuration node\nconst config = $('Configuration').first().json;\nconst includeSourceLink = config.includeSourceLink;\nconst MAX_TITLE_LENGTH = config.maxTitleLength || 100;\n\n// Get the post data from the Loop Over Items node\nconst caption = $('Loop Over Items').item.json.caption || '';\nconst postId = $('Loop Over Items').item.json.id;\nconst mediaUrl = $('Loop Over Items').item.json.media_url;\nconst permalink = $('Loop Over Items').item.json.permalink;\n\n// Extract hashtags\nconst hashtagRegex = /#[\\w\\u00C0-\\u024F]+/gu;\nconst hashtags = caption.match(hashtagRegex) || [];\n\n// Get text before first hashtag for YouTube title\nconst firstHashtagIndex = caption.indexOf('#');\nlet textBeforeHashtags = firstHashtagIndex === -1 \n  ? caption.trim() \n  : caption.substring(0, firstHashtagIndex).trim();\n\n// Build YouTube title\nlet youtubeTitle = textBeforeHashtags;\n\n// If no text before hashtags, use first hashtag\nif (!youtubeTitle && hashtags.length > 0) {\n  youtubeTitle = hashtags[0].replace('#', '');\n}\n\n// If still no title, use generic\nif (!youtubeTitle) {\n  youtubeTitle = 'Instagram Video';\n}\n\n// Smart truncation at word boundary for YouTube\nif (youtubeTitle.length > MAX_TITLE_LENGTH) {\n  youtubeTitle = youtubeTitle.substring(0, MAX_TITLE_LENGTH);\n  const lastSpace = youtubeTitle.lastIndexOf(' ');\n  if (lastSpace > MAX_TITLE_LENGTH * 0.6) {\n    youtubeTitle = youtubeTitle.substring(0, lastSpace);\n  }\n  youtubeTitle = youtubeTitle.trim() + '...';\n}\n\n// Build YouTube description\nlet youtubeDescription = caption;\nif (includeSourceLink) {\n  youtubeDescription += `\\n\\n---\\nOriginally posted on Instagram: ${permalink}`;\n}\n\n// Extract tags for YouTube (without # symbol, max 10)\nconst youtubeTags = hashtags\n  .map(h => h.replace('#', ''))\n  .filter(t => t.length > 1 && t.length <= 30)\n  .slice(0, 10);\n\n// Build Twitter text - use full caption\nlet twitterText = caption;\n\n// Twitter character limit is 280\nif (includeSourceLink) {\n  const sourceLink = `\\n\\nOriginally posted on Instagram: ${permalink}`;\n  const maxCaptionLength = 280 - sourceLink.length;\n  \n  if (twitterText.length > maxCaptionLength) {\n    twitterText = twitterText.substring(0, maxCaptionLength - 3).trim() + '...';\n  }\n  twitterText += sourceLink;\n} else {\n  if (twitterText.length > 280) {\n    twitterText = twitterText.substring(0, 277).trim() + '...';\n  }\n}\n\n// Return processed data for both platforms\nreturn [{\n  json: {\n    postId: postId,\n    // YouTube data\n    youtubeTitle: youtubeTitle,\n    youtubeDescription: youtubeDescription,\n    youtubeTags: youtubeTags,\n    // Twitter data\n    twitterText: twitterText,\n    // Shared data\n    mediaUrl: mediaUrl,\n    originalCaption: caption,\n    hashtagCount: hashtags.length,\n    sourceLinkIncluded: includeSourceLink\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ],
+      "id": "process-content",
+      "name": "Process Content for Both Platforms"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mediaUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        864,
+        0
+      ],
+      "id": "download-video",
+      "name": "Download Video"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Process Content for Both Platforms').item.json.youtubeTitle }}",
+        "categoryId": "={{ $('Configuration').item.json.categoryId }}",
+        "options": {
+          "defaultLanguage": "={{ $('Configuration').item.json.defaultLanguage }}",
+          "description": "={{ $('Process Content for Both Platforms').item.json.youtubeDescription }}",
+          "embeddable": true,
+          "license": "youtube",
+          "madeForKids": false,
+          "notifySubscribers": true,
+          "privacyStatus": "={{ $('Configuration').item.json.privacyStatus }}",
+          "publicStatsViewable": true,
+          "selfDeclaredMadeForKids": false,
+          "tags": "={{ $('Process Content for Both Platforms').item.json.youtubeTags.join(',') }}"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        -96
+      ],
+      "id": "upload-to-youtube",
+      "name": "Upload to YouTube",
+      "continueOnFail": true,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_YOUTUBE_CREDENTIAL_ID",
+          "name": "YouTube Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.twitter.com/1.1/media/upload.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        96
+      ],
+      "id": "upload-media-twitter",
+      "name": "Upload Media to Twitter",
+      "continueOnFail": true,
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_TWITTER_CREDENTIAL_ID",
+          "name": "Twitter OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('Process Content for Both Platforms').item.json.twitterText }}"
+            },
+            {
+              "name": "media",
+              "value": "={{ { \"media_ids\": [$json.media_id_string] } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1312,
+        96
+      ],
+      "id": "create-tweet",
+      "name": "Create Tweet",
+      "continueOnFail": true,
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_TWITTER_CREDENTIAL_ID",
+          "name": "Twitter OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "merge-results",
+      "name": "Merge Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect results from both platforms\nconst youtubeData = $input.first().json;\nconst twitterData = $input.last().json;\nconst processedData = $('Process Content for Both Platforms').first().json;\n\n// Determine which platforms succeeded\nconst youtubeId = youtubeData.id || null;\nconst tweetId = twitterData?.data?.id || null;\n\nlet platform = 'none';\nif (youtubeId && tweetId) {\n  platform = 'both';\n} else if (youtubeId) {\n  platform = 'youtube';\n} else if (tweetId) {\n  platform = 'twitter';\n}\n\n// Build timestamp\nconst uploadedAt = new Date().toISOString();\n\nreturn [{\n  json: {\n    postId: processedData.postId,\n    youtubeId: youtubeId,\n    tweetId: tweetId,\n    platform: platform,\n    uploadedAt: uploadedAt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "prepare-record",
+      "name": "Prepare Upload Record"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_DATATABLE_ID",
+          "mode": "list",
+          "cachedResultName": "Instagram Dual Upload"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "postId": "={{ $json.postId }}",
+            "youtubeId": "={{ $json.youtubeId }}",
+            "tweetId": "={{ $json.tweetId }}",
+            "platform": "={{ $json.platform }}",
+            "uploadedAt": "={{ $json.uploadedAt }}"
+          },
+          "matchingColumns": [
+            "postId"
+          ],
+          "schema": [
+            {
+              "id": "postId",
+              "displayName": "postId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "youtubeId",
+              "displayName": "youtubeId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tweetId",
+              "displayName": "tweetId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "uploadedAt",
+              "displayName": "uploadedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        0
+      ],
+      "id": "save-dual-record",
+      "name": "Save Dual Upload Record"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-done",
+              "name": "status",
+              "type": "string",
+              "value": "Workflow completed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "done-node",
+      "name": "Done",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -256,
+        -192
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "## Instagram to YouTube + Twitter (Dual Post)\n\nAutomatically upload Instagram videos to BOTH YouTube and Twitter simultaneously.\n\n### Configuration Options\nEdit the **Configuration** node to customize:\n\n```json\n{\n  \"includeSourceLink\": true,    // Include Instagram link\n  \"waitTimeoutSeconds\": 15,     // Delay between uploads\n  \"maxTitleLength\": 100,        // Max YouTube title length\n  \"categoryId\": \"24\",           // YouTube category\n  \"privacyStatus\": \"public\",    // public, private, or unlisted\n  \"defaultLanguage\": \"en\",      // Video language code\n  \"postToYouTube\": true,        // Enable YouTube posting\n  \"postToTwitter\": true         // Enable Twitter posting\n}\n```\n\n### How It Works\n1. Fetches latest 25 Instagram posts daily\n2. Filters to only VIDEO and REELS\n3. Checks Data Table to skip already-posted content\n4. Downloads video once from Instagram\n5. **PARALLEL UPLOAD**: Uploads to both platforms simultaneously\n   - YouTube: Full upload with title, description, tags\n   - Twitter: Media upload + tweet creation\n6. Merges results and tracks which platforms succeeded\n7. Saves record with both platform IDs\n\n### Requirements\n- **Instagram**: Meta Developer Portal + Instagram Bearer Token\n- **YouTube**: OAuth2 API credentials\n- **Twitter**: OAuth 2.0 API credentials\n- **Data Table**: Create table named \"Instagram Dual Upload\" with fields:\n  - `postId` (string, primary key)\n  - `youtubeId` (string)\n  - `tweetId` (string)\n  - `platform` (string: \"both\", \"youtube\", \"twitter\", \"none\")\n  - `uploadedAt` (string, ISO timestamp)\n\n### Error Handling\n- Each platform upload is independent (continueOnFail enabled)\n- If YouTube fails, Twitter still attempts upload\n- If Twitter fails, YouTube success is still recorded\n- `platform` field tracks which succeeded: \"both\", \"youtube\", \"twitter\", or \"none\"\n\n### Setup Steps\n1. Edit **Configuration** node with your preferences\n2. Set **Instagram Bearer Auth** in **Fetch Instagram Posts**\n3. Set **YouTube OAuth2** in **Upload to YouTube**\n4. Set **Twitter OAuth2** in **Upload Media to Twitter** and **Create Tweet**\n5. Create Data Table with 5 fields (see schema above)\n6. Update Data Table ID in **Check If Already Uploaded** and **Save Dual Upload Record**\n\n### Platform Limits\n**YouTube**:\n- 10,000 quota units/day (50 units per upload)\n- Max 100 characters in title (configurable)\n\n**Twitter**:\n- 300 tweets per 3 hours\n- 280 character limit (media doesn't count)\n- Max 512MB video, 2min 20sec length\n\n### Category IDs (YouTube)\n| ID | Category |\n|----|----------|\n| 24 | Entertainment |\n| 20 | Gaming |\n| 22 | People & Blogs |\n| 23 | Comedy |\n| 10 | Music |",
+        "height": 1280,
+        "width": 678
+      },
+      "id": "instructions-note",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2160,
+        -416
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 0. Configuration\nAll settings in one place. Toggle platforms on/off independently.",
+        "height": 224,
+        "width": 256,
+        "color": 5
+      },
+      "id": "sticky-config",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1184,
+        -144
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 1. Fetch & Filter Videos\nGets Instagram posts and filters to only VIDEO/REELS media types.",
+        "height": 304,
+        "width": 500,
+        "color": 6
+      },
+      "id": "sticky-fetch",
+      "name": "Sticky Note - Fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -960,
+        -144
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 2. Deduplication\nCheck each video against data table to skip already uploaded content.",
+        "height": 384,
+        "width": 388,
+        "color": 7
+      },
+      "id": "sticky-check",
+      "name": "Sticky Note - Check",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        -112
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 3. Process & Download\n- Processes content for BOTH platforms\n- YouTube gets title/description/tags\n- Twitter gets tweet text\n- Downloads video once (shared by both)",
+        "height": 304,
+        "width": 500,
+        "color": 4
+      },
+      "id": "sticky-process",
+      "name": "Sticky Note - Process",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        608,
+        -144
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 4. Dual Platform Upload\n- PARALLEL: Both uploads happen simultaneously\n- Independent error handling (continueOnFail)\n- YouTube: Full video upload with metadata\n- Twitter: 2-step (media upload + create tweet)",
+        "height": 464,
+        "width": 500,
+        "color": 3
+      },
+      "id": "sticky-upload",
+      "name": "Sticky Note - Upload",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1056,
+        -272
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 5. Merge & Save\n- Merges results from both platforms\n- Determines which succeeded\n- Saves comprehensive record with both IDs",
+        "height": 304,
+        "width": 692,
+        "color": 2
+      },
+      "id": "sticky-save",
+      "name": "Sticky Note - Save",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1504,
+        -144
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Instagram Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instagram Posts": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter Videos Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Videos Only": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If Already Uploaded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already Uploaded": {
+      "main": [
+        [
+          {
+            "node": "If Not Uploaded Yet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Uploaded Yet": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Process Content for Both Platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Content for Both Platforms": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Upload to YouTube",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upload Media to Twitter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to YouTube": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media to Twitter": {
+      "main": [
+        [
+          {
+            "node": "Create Tweet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tweet": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upload Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Upload Record": {
+      "main": [
+        [
+          {
+            "node": "Save Dual Upload Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Dual Upload Record": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "instagram-dual-post-template"
+  }
+}

@@ -1,0 +1,651 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        17536,
+        2520
+      ],
+      "id": "bcf35f31-9192-47c5-a0f4-65b463a9cfb6",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"includeSourceLink\": true,\n  \"waitTimeoutSeconds\": 2,\n  \"videoOnly\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        17760,
+        2520
+      ],
+      "id": "c13af1f8-a123-4d60-8e03-0d6a764ae52c",
+      "name": "Configuration"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.instagram.com/me/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"fields\": \"id,caption,media_url,media_type,timestamp,permalink\",\n  \"limit\": \"25\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        17984,
+        2520
+      ],
+      "id": "50940c64-b1c1-456a-9f1d-d1496a4c3cc1",
+      "name": "Fetch Instagram Posts",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngxNKAAR2WN7cqrp",
+          "name": "Bearer Auth Instagram Account Statuenable"
+        },
+        "twitterOAuth1Api": {
+          "id": "9wh4OtsLu9eDG7dB",
+          "name": "X OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        18208,
+        2520
+      ],
+      "id": "b5dd8283-a2fb-4ebd-bb64-1388af77582e",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "video-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "VIDEO"
+            },
+            {
+              "id": "reels-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.media_type }}",
+              "rightValue": "REELS"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d088112d-104a-49b3-9b52-02785882bbeb",
+      "name": "Filter Videos Only",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        18432,
+        2520
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        18656,
+        2520
+      ],
+      "id": "084e656c-5dfe-48c5-8734-2a0096fb7bc2",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "9W8s0fYgwjIgPKm8",
+          "mode": "list",
+          "cachedResultName": "Instagram to Twitter",
+          "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/9W8s0fYgwjIgPKm8"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "=postId",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        18880,
+        2448
+      ],
+      "id": "4a64a775-6c0f-4ea6-862b-d9eada5cb83f",
+      "name": "Check If Already Posted",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "not-exists-check",
+              "leftValue": "={{ $json.postId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        19104,
+        2520
+      ],
+      "id": "fff76712-95f7-4780-87e1-c656b575d27e",
+      "name": "If Not Posted Yet"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Configuration').item.json.waitTimeoutSeconds }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        19328,
+        2520
+      ],
+      "id": "36d8fa9a-30a9-40ec-91b2-6f1bd11fcb96",
+      "name": "Wait",
+      "webhookId": "instagram-twitter-wait"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get configuration from the Configuration node\nconst config = $('Configuration').first().json;\nconst includeSourceLink = config.includeSourceLink;\n\n// Get the post data from the Loop Over Items node\nconst caption = $('Loop Over Items').item.json.caption || '';\nconst postId = $('Loop Over Items').item.json.id;\nconst mediaUrl = $('Loop Over Items').item.json.media_url;\nconst permalink = $('Loop Over Items').item.json.permalink;\n\n// Extract hashtags\nconst hashtagRegex = /#[\\w\\u00C0-\\u024F]+/gu;\nconst hashtags = caption.match(hashtagRegex) || [];\n\n// Build tweet text - use full caption\nlet tweetText = caption;\n\n// Twitter character limit is 280\n// Reserve space for media (images/videos don't count toward limit)\n// But if we include source link, we need to account for it\nif (includeSourceLink) {\n  const sourceLink = `\\n\\nOriginally posted on Instagram: ${permalink}`;\n  const maxCaptionLength = 280 - sourceLink.length;\n  \n  if (tweetText.length > maxCaptionLength) {\n    tweetText = tweetText.substring(0, maxCaptionLength - 3).trim() + '...';\n  }\n  tweetText += sourceLink;\n} else {\n  // Just ensure we're under 280 characters\n  if (tweetText.length > 280) {\n    tweetText = tweetText.substring(0, 277).trim() + '...';\n  }\n}\n\n// Return processed data\nreturn [{\n  json: {\n    postId: postId,\n    tweetText: tweetText,\n    mediaUrl: mediaUrl,\n    originalCaption: caption,\n    hashtagCount: hashtags.length,\n    sourceLinkIncluded: includeSourceLink\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19552,
+        2520
+      ],
+      "id": "64b96273-fc40-4401-850b-496edcf982ae",
+      "name": "Process Caption"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.mediaUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        19776,
+        2520
+      ],
+      "id": "7076eb89-46fb-4e38-b1f5-4f7aaa560f79",
+      "name": "Download Video",
+      "credentials": {
+        "twitterOAuth1Api": {
+          "id": "9wh4OtsLu9eDG7dB",
+          "name": "X OAuth account"
+        },
+        "oAuth2Api": {
+          "id": "zfs6gS2iQRy0Ia7l",
+          "name": "Custom Twitter Auth2 for Media"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Process Caption').item.json.tweetText }}",
+        "additionalFields": {
+          "attachments": ""
+        }
+      },
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        20224,
+        2520
+      ],
+      "id": "a8d5a521-a9a1-49b7-9c9d-fa738cf1283e",
+      "name": "Create Tweet",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "Rm6H3keTsAY0galG",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "9W8s0fYgwjIgPKm8",
+          "mode": "list",
+          "cachedResultName": "Instagram to Twitter",
+          "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/9W8s0fYgwjIgPKm8"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tweetId": "={{ $json.id }}",
+            "postId": "={{ $('Process Caption').item.json.postId }}"
+          },
+          "matchingColumns": [
+            "postId"
+          ],
+          "schema": [
+            {
+              "id": "postId",
+              "displayName": "postId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tweetId",
+              "displayName": "tweetId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        20448,
+        2592
+      ],
+      "id": "0bda9707-3077-4d5e-85f4-556f37bef417",
+      "name": "Save Post Record"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-done",
+              "name": "status",
+              "type": "string",
+              "value": "Workflow completed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf37376f-f1eb-4178-84ef-ea5a3ce9b822",
+      "name": "Done",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        18880,
+        2256
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "## Instagram to Twitter (Basic)\n\nAutomatically cross-post Instagram videos to Twitter.\n\n### Configuration Options\nEdit the **Configuration** node to customize:\n\n```json\n{\n  \"includeSourceLink\": true,    // Include Instagram link in tweet\n  \"waitTimeoutSeconds\": 15,     // Delay between posts (rate limiting)\n  \"videoOnly\": true             // Only process VIDEO and REELS\n}\n```\n\n### How It Works\n1. Fetches latest 25 Instagram posts daily\n2. Filters to only VIDEO and REELS media types\n3. Checks Data Table to skip already-posted content\n4. Downloads video from Instagram\n5. Uploads media to Twitter (2-step process)\n6. Creates tweet with video and caption\n7. Saves record to prevent duplicates\n\n### Requirements\n- **Instagram**: Meta Developer Portal + Instagram Bearer Token\n- **Twitter**: OAuth 2.0 API credentials\n- **Data Table**: Create table named \"Instagram to Twitter\" with fields:\n  - `postId` (string, primary key)\n  - `tweetId` (string)\n\n### Setup Steps\n1. Edit **Configuration** node with your preferences\n2. Set **Bearer Auth** credentials in **Fetch Instagram Posts**\n3. Create Data Table with fields: `postId`, `tweetId`\n4. Update Data Table ID in **Check If Already Posted** and **Save Post Record**\n5. Set **Twitter OAuth2** credentials in **Upload Media to Twitter** and **Create Tweet**\n\n### Twitter API Limits\n- **Video size**: Max 512MB\n- **Video length**: Max 2 minutes 20 seconds (Free tier)\n- **Tweet rate**: 300 tweets per 3 hours\n- **Character limit**: 280 characters (media doesn't count)\n\n### Notes\n- Schedule runs daily at midnight (adjust cron expression if needed)\n- Wait timeout prevents rate limiting issues\n- Full caption is used in tweet (truncated if needed)\n- Hashtags from Instagram are preserved in tweet",
+        "height": 1040,
+        "width": 678
+      },
+      "id": "d23c3c54-e776-4fbe-a009-dfe03bc7159c",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16752,
+        2032
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 0. Configuration\nAll settings in one place. Edit JSON to customize behavior.",
+        "height": 224,
+        "width": 256,
+        "color": 5
+      },
+      "id": "4ffeac2a-6925-485e-9186-855865578a21",
+      "name": "Sticky Note - Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        17728,
+        2304
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 1. Fetch & Filter Videos\nGets Instagram posts and filters to only VIDEO/REELS media types.",
+        "height": 304,
+        "width": 500,
+        "color": 6
+      },
+      "id": "60566d4a-bca2-4dd4-8a5c-2f30d61708a8",
+      "name": "Sticky Note - Fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        17894,
+        2376
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 2. Deduplication\nCheck each video against data table to skip already posted content.",
+        "height": 384,
+        "width": 388,
+        "color": 7
+      },
+      "id": "dcd71b1f-ae5e-469e-ad80-86f7f9bb03b3",
+      "name": "Sticky Note - Check",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        18846,
+        2296
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 3. Process & Post to Twitter\n- Uses config for wait timeout\n- Conditionally includes source link\n- Downloads video from Instagram\n- Uploads media to Twitter v1.1 endpoint (supports large videos)\n- Uses media_category: tweet_video\n- Creates tweet with media and caption\n- Respects 280 character limit",
+        "height": 304,
+        "width": 964,
+        "color": 3
+      },
+      "id": "8d5688ce-5235-4b4e-819a-538ab8f5ad1f",
+      "name": "Sticky Note - Upload",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        19454,
+        2376
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.twitter.com/1.1/media/upload.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth1Api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media_category",
+              "value": "tweet_video"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "media",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7e52125d-4064-475a-8119-65001cdd2704",
+      "name": "Upload Media to X",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        20000,
+        2520
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "twitterOAuth1Api": {
+          "id": "9wh4OtsLu9eDG7dB",
+          "name": "X OAuth account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Instagram Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instagram Posts": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter Videos Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Videos Only": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If Already Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already Posted": {
+      "main": [
+        [
+          {
+            "node": "If Not Posted Yet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Posted Yet": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Process Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Caption": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Media to X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tweet": {
+      "main": [
+        [
+          {
+            "node": "Save Post Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Post Record": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media to X": {
+      "main": [
+        [
+          {
+            "node": "Create Tweet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

@@ -1,0 +1,1384 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ebbdb398-2e54-4298-9c32-11008d3923c4",
+      "name": "End Cleanup Loop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        31712,
+        7664
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "f9655491-244f-4041-86c5-09699126d7a7",
+      "name": "Delete Old Metadata File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        31712,
+        7856
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gVg184aZJ4sXz9Uo",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a180ef16-fa2e-4001-b627-18400aa3147c",
+      "name": "Loop Over Old Files",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        31488,
+        7808
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nconst allFiles = response.files || [];\n\nconsole.log('Total metadata files found:', allFiles.length);\n\nif (allFiles.length <= 1) {\n  console.log('Only one or no metadata files - nothing to delete');\n  return [];\n}\n\nallFiles.sort((a, b) => new Date(a.createdTime) - new Date(b.createdTime));\n\nconst newestFile = allFiles[allFiles.length - 1];\nconst filesToDelete = allFiles.slice(0, -1);\n\nconsole.log('Keeping:', newestFile.name, newestFile.createdTime);\nconsole.log('Deleting', filesToDelete.length, 'old file(s)');\n\nreturn filesToDelete.map(file => ({\n  fileId: file.id,\n  fileName: file.name,\n  createdTime: file.createdTime\n}));"
+      },
+      "id": "c15bcad5-4ff1-4dd5-8ab2-e11514863a8a",
+      "name": "Find Old Metadata Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31264,
+        7808
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name='{{ $('Configuration').first().json.metadataFileName }}' and '{{ $('Configuration').first().json.googleDriveFolderId }}' in parents and trashed=false"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,createdTime)"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ab77e83b-0129-408b-b507-6af65f9f9535",
+      "name": "List All Metadata Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        31040,
+        7808
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Build Metadata from Data Table').item.json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Configuration').first().json.googleDriveFolderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "e8b1432a-bbe7-4fba-a831-c206bb7b0095",
+      "name": "Upload New Metadata File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        30816,
+        7808
+      ],
+      "inputsOverride": {
+        "main": [
+          {
+            "sourcePath": "$('Build Metadata from Data Table')"
+          }
+        ]
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gVg184aZJ4sXz9Uo",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tableRecords = $('Get All Data Table Records').all();\nconst videos = tableRecords.map(item => item.json);\n\nconst metadata = {\n  lastUpdated: new Date().toISOString(),\n  totalVideos: videos.length,\n  videos: videos\n};\n\nconsole.log('Built metadata with', videos.length, 'videos');\n\nconst jsonContent = JSON.stringify(metadata, null, 2);\nconst binaryData = Buffer.from(jsonContent, 'utf-8');\n\nreturn {\n  json: { fileName: $('Configuration').item.json.metadataFileName },\n  binary: {\n    data: {\n      data: binaryData,\n      mimeType: 'application/json',\n      fileName: $('Configuration').item.json.metadataFileName\n    }\n  }\n};"
+      },
+      "id": "c9a1fa2e-87a1-4a16-a8ef-7649f80540fb",
+      "name": "Build Metadata from Data Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30592,
+        7808
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "placeholder-table-id",
+          "mode": "list",
+          "cachedResultName": "YouTube Video Backups"
+        },
+        "returnAll": true
+      },
+      "id": "40ee3e2a-96f5-436b-9027-12d25d51e152",
+      "name": "Get All Data Table Records",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        30368,
+        7808
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "74ec8a84-47ad-47ab-a781-c0509ab241de",
+      "name": "End Loop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        33056,
+        8192
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "vorb7iLCuxLH8x3r",
+          "mode": "list",
+          "cachedResultName": "YouTube Videos Backup",
+          "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/vorb7iLCuxLH8x3r"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "videoId": "={{ $json.videoId }}",
+            "title": "={{ $json.title }}",
+            "description": "={{ $json.description }}",
+            "tags": "={{ $json.tags }}",
+            "categoryId": "={{ $json.categoryId }}",
+            "publishedAt": "={{ $json.publishedAt }}",
+            "duration": "={{ $json.duration }}",
+            "thumbnailDriveFileId": "={{ $json.thumbnailDriveFileId }}",
+            "thumbnailDriveFileName": "={{ $json.thumbnailDriveFileName }}",
+            "videoDriveFileId": "={{ $json.videoDriveFileId }}",
+            "videoDriveFileName": "={{ $json.videoDriveFileName }}",
+            "backedUpAt": "={{ $json.backedUpAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "videoId",
+              "displayName": "videoId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tags",
+              "displayName": "tags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categoryId",
+              "displayName": "categoryId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publishedAt",
+              "displayName": "publishedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "duration",
+              "displayName": "duration",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "thumbnailDriveFileId",
+              "displayName": "thumbnailDriveFileId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "thumbnailDriveFileName",
+              "displayName": "thumbnailDriveFileName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "videoDriveFileId",
+              "displayName": "videoDriveFileId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "videoDriveFileName",
+              "displayName": "videoDriveFileName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "backedUpAt",
+              "displayName": "backedUpAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "91f45996-7afe-48e6-b136-791bff1e1a86",
+      "name": "Save Backup Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        32832,
+        7984
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vid-id",
+              "name": "videoId",
+              "value": "={{ $('Loop Over Videos').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-title",
+              "name": "title",
+              "value": "={{ $('Loop Over Videos').item.json.snippet.title }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-desc",
+              "name": "description",
+              "value": "={{ $('Loop Over Videos').item.json.snippet.description }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-tags",
+              "name": "tags",
+              "value": "={{ $('Loop Over Videos').item.json.snippet.tags ? $('Loop Over Videos').item.json.snippet.tags.join(', ') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-cat",
+              "name": "categoryId",
+              "value": "={{ $('Loop Over Videos').item.json.snippet.categoryId }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-pub",
+              "name": "publishedAt",
+              "value": "={{ $('Loop Over Videos').item.json.snippet.publishedAt }}",
+              "type": "string"
+            },
+            {
+              "id": "vid-dur",
+              "name": "duration",
+              "value": "={{ $('Loop Over Videos').item.json.contentDetails.duration }}",
+              "type": "string"
+            },
+            {
+              "id": "thumb-fid",
+              "name": "thumbnailDriveFileId",
+              "value": "={{ $('Upload Thumbnail to Drive').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "thumb-fname",
+              "name": "thumbnailDriveFileName",
+              "value": "={{ $('Loop Over Videos').item.json.id }}-thumb.jpg",
+              "type": "string"
+            },
+            {
+              "id": "video-fid",
+              "name": "videoDriveFileId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "video-fname",
+              "name": "videoDriveFileName",
+              "value": "={{ $('Loop Over Videos').item.json.id }}.mp4",
+              "type": "string"
+            },
+            {
+              "id": "backed-up",
+              "name": "backedUpAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dfee1dc7-7be3-4fba-856e-61cc09d7a706",
+      "name": "Extract Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        32608,
+        7984
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Loop Over Videos').item.json.id }}.mp4",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Configuration').first().json.googleDriveFolderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "d6659e04-2685-4cd6-a6c7-f881f827899a",
+      "name": "Upload Video to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        32384,
+        7984
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gVg184aZJ4sXz9Uo",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.downloadUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "1e714378-788b-4605-9077-7f34c1c2db66",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32160,
+        7984
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "url-valid",
+              "leftValue": "={{ $json.error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": "false"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8a477be0-3859-4e0e-8669-8ae0726bde1c",
+      "name": "IF Download URL Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        31936,
+        8048
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\n\nif (!response || response.status === 'error') {\n  console.log('Download service error:', JSON.stringify(response));\n  return { json: { downloadUrl: '', error: true } };\n}\n\nconsole.log('Download ready, status:', response.status);\nreturn { json: { downloadUrl: response.url, error: false } };"
+      },
+      "id": "b29df6fa-c3e8-453e-93ee-e8d64df6c90a",
+      "name": "Parse Download Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31712,
+        8048
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').item.json.downloadServiceUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Configuration').item.json.cobaltApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={                          \n    \"url\": \"https://www.youtube.com/watch?v={{ $('Loop Over Videos').item.json.id }}\",                                   \n    \"videoQuality\": \"{{ $('Configuration').item.json.videoQuality }}\",\n    \"vCodec\": \"h264\",\n    \"audioBitrate\": \"128\"                 }",
+        "options": {}
+      },
+      "id": "8eef64f8-d0ad-4146-92e9-8154bf441b7e",
+      "name": "Request Video Download",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        31488,
+        8048
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Configuration').item.json.waitBetweenDownloads }}"
+      },
+      "id": "cc984816-2b5b-4b7f-8e50-adf19e10a524",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        31264,
+        8048
+      ],
+      "webhookId": "wait-webhook-ytbk"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Loop Over Videos').item.json.id }}-thumb.jpg",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Configuration').first().json.googleDriveFolderId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "829075dd-854e-4431-b3c1-6626f581424a",
+      "name": "Upload Thumbnail to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        31040,
+        8048
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gVg184aZJ4sXz9Uo",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Loop Over Videos').item.json.snippet.thumbnails.high ? $('Loop Over Videos').item.json.snippet.thumbnails.high.url : ($('Loop Over Videos').item.json.snippet.thumbnails.medium ? $('Loop Over Videos').item.json.snippet.thumbnails.medium.url : $('Loop Over Videos').item.json.snippet.thumbnails.default.url) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "768fe043-e938-4b91-99d1-18f4e341d1a5",
+      "name": "Download Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        30816,
+        8048
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "not-backed-up",
+              "leftValue": "={{ $('Check If Already Backed Up').first().json }}",
+              "rightValue": "videoId",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "afd8a095-5802-44f4-8d68-630b3ebd3853",
+      "name": "IF Not Already Backed Up",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        30544,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "vorb7iLCuxLH8x3r",
+          "mode": "list",
+          "cachedResultName": "YouTube Videos Backup",
+          "cachedResultUrl": "/projects/vZdjtqHcrLoO32Ib/datatables/vorb7iLCuxLH8x3r"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "=videoId",
+              "condition": "=eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "a75e6487-83b3-4e4d-b2b2-04a774452ee7",
+      "name": "Check If Already Backed Up",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        30352,
+        8128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "9c172551-aa15-442f-ad8d-99be88d42029",
+      "name": "Loop Over Videos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        30144,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "id": "b654a850-1737-4053-abec-6c7c1cd5e34e",
+      "name": "Split Out Videos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        29920,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nconst items = response.items || [];\n\nconsole.log('Videos fetched:', items.length);\n\nitems.sort((a, b) => new Date(a.snippet.publishedAt) - new Date(b.snippet.publishedAt));\n\nif (items.length > 0) {\n  console.log('Earliest:', items[0].snippet.title, items[0].snippet.publishedAt);\n  console.log('Latest:', items[items.length - 1].snippet.title, items[items.length - 1].snippet.publishedAt);\n}\n\nreturn { json: { items } };"
+      },
+      "id": "b01a6493-ae11-4ec7-9483-d47d59c94a87",
+      "name": "Sort Earliest to Latest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29696,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/youtube/v3/videos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet,contentDetails"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.videoIds }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "57dc60ee-8d69-46e7-90ee-a666702325b1",
+      "name": "Get Video Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        29472,
+        8128
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "LZbKs6ZEc2SEt766",
+          "name": "YouTube Account Dollenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.item.json.items || [];\nconst videoIds = items.map(item => item.snippet.resourceId.videoId);\nconsole.log('Extracted', videoIds.length, 'video IDs');\nreturn { json: { videoIds: videoIds.join(',') } };"
+      },
+      "id": "d9ef418b-ef6f-4a9e-9ff9-6e61f19825dc",
+      "name": "Extract Video IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29248,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/youtube/v3/playlistItems",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "playlistId",
+              "value": "={{ $json.items[0].contentDetails.relatedPlaylists.uploads }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "={{ $('Configuration').item.json.maxVideosPerRun }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ee33c17-1ecc-4be8-9f8e-f8c74d26b4b8",
+      "name": "Get Playlist Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        29024,
+        8128
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "LZbKs6ZEc2SEt766",
+          "name": "YouTube Account Dollenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/youtube/v3/channels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "contentDetails"
+            },
+            {
+              "name": "mine",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1356d04a-eaec-4b15-9332-44cf999ded1f",
+      "name": "Get Uploads Playlist ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        28800,
+        8128
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "zfs6gS2iQRy0Ia7l",
+          "name": "Custom Twitter Auth2 for Media"
+        },
+        "httpBearerAuth": {
+          "id": "5xW3IOTiDM0UmUbr",
+          "name": "Bearer Auth Meta Developer Instagram Doll Enable"
+        },
+        "youTubeOAuth2Api": {
+          "id": "LZbKs6ZEc2SEt766",
+          "name": "YouTube Account Dollenable"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "drive-folder",
+              "name": "googleDriveFolderId",
+              "value": "1fNbI7Z8lftD2GMfcSjSkhuyG8L5CrrdG",
+              "type": "string"
+            },
+            {
+              "id": "max-videos",
+              "name": "maxVideosPerRun",
+              "value": 50,
+              "type": "number"
+            },
+            {
+              "id": "video-quality",
+              "name": "videoQuality",
+              "value": "720",
+              "type": "string"
+            },
+            {
+              "id": "dl-service",
+              "name": "downloadServiceUrl",
+              "value": "https://api.cobalt.tools",
+              "type": "string"
+            },
+            {
+              "id": "cobalt-key",
+              "name": "cobaltApiKey",
+              "value": "YOUR_COBALT_API_KEY_HERE",
+              "type": "string"
+            },
+            {
+              "id": "wait-secs",
+              "name": "waitBetweenDownloads",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "meta-file",
+              "name": "metadataFileName",
+              "value": "youtube-backup-metadata.json",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "424b7690-61f9-44c8-b0d5-cca24671c0dc",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        28576,
+        8128
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "id": "166ec91b-4189-439c-ba17-2a0b8e6321aa",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        28352,
+        8224
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "38edc59e-e23a-45ef-8024-91b59776b272",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        28352,
+        8032
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Update JSON Catalog\n\nExports entire Data Table to JSON after loop completes.\nCleans up old metadata files — keeps only the newest.",
+        "height": 280,
+        "width": 2000,
+        "color": 3
+      },
+      "id": "a42057a4-561d-4f0f-9c72-13a60db8cea5",
+      "name": "Update JSON Catalog",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        30208,
+        7456
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Process Videos\n\nDownloads via Cobalt API (or configured service).\nVideo: 720p H264 default.\nThumbnails: fetched directly from YouTube (no API key needed).",
+        "height": 280,
+        "width": 2900,
+        "color": 7
+      },
+      "id": "ec47ece1-727d-430b-8ebb-bfeb99d3fa85",
+      "name": "Process Videos",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        30320,
+        7552
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Fetch & Filter",
+        "height": 280,
+        "width": 1200,
+        "color": 6
+      },
+      "id": "1b4975bc-9454-4050-97d4-cbcae336726d",
+      "name": "Fetch & Filter",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        30048,
+        7696
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## YouTube Video Backup to Google Drive\n\nBacks up your YouTube videos + thumbnails to Google Drive with a JSON metadata catalog.\n\n### Prerequisites\n- Google Drive folder (note folder ID from URL)\n- Video download service:\n  - Free public API: https://api.cobalt.tools\n  - Self-host: https://github.com/nicehash/cobalt\n\n### 1. Create Data Table\nName: **YouTube Video Backups**\nColumns:\n- `videoId` (string)\n- `title` (string)\n- `description` (string)\n- `tags` (string)\n- `categoryId` (string)\n- `publishedAt` (string)\n- `duration` (string)\n- `thumbnailDriveFileId` (string)\n- `thumbnailDriveFileName` (string)\n- `videoDriveFileId` (string)\n- `videoDriveFileName` (string)\n- `backedUpAt` (string)\n\n### 2. Add Credentials\n- **Google Drive**: OAuth2\n- **YouTube**: OAuth2 (scope: youtube.force-ssl)\n\n### 3. Configure\n- Set `googleDriveFolderId` in Configuration node\n- `videoQuality`: 720 (default) or 1080\n- `downloadServiceUrl`: your download service endpoint\n\n### File Naming\n- Video: `{videoId}.mp4`\n- Thumbnail: `{videoId}-thumb.jpg`\n- Metadata: `youtube-backup-metadata.json`\n\n### Recovery\nUse **template-reupload.json** to restore from backup.",
+        "height": 1150,
+        "width": 860
+      },
+      "id": "89935c0c-55b3-4351-a0ea-e242e9b1f2c3",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        27552,
+        7200
+      ]
+    }
+  ],
+  "connections": {
+    "Delete Old Metadata File": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Old Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Old Files": {
+      "main": [
+        [
+          {
+            "node": "End Cleanup Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Old Metadata File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Old Metadata Files": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Old Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Metadata Files": {
+      "main": [
+        [
+          {
+            "node": "Find Old Metadata Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload New Metadata File": {
+      "main": [
+        [
+          {
+            "node": "List All Metadata Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Metadata from Data Table": {
+      "main": [
+        [
+          {
+            "node": "Upload New Metadata File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Data Table Records": {
+      "main": [
+        [
+          {
+            "node": "Build Metadata from Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "End Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Backup Record": {
+      "main": [
+        [
+          {
+            "node": "End Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Metadata": {
+      "main": [
+        [
+          {
+            "node": "Save Backup Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Video to Drive": {
+      "main": [
+        [
+          {
+            "node": "Extract Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Video to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Download URL Valid": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "End Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Download Response": {
+      "main": [
+        [
+          {
+            "node": "IF Download URL Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Video Download": {
+      "main": [
+        [
+          {
+            "node": "Parse Download Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Request Video Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Thumbnail to Drive": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "Upload Thumbnail to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Not Already Backed Up": {
+      "main": [
+        [
+          {
+            "node": "Download Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "End Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Already Backed Up": {
+      "main": [
+        [
+          {
+            "node": "IF Not Already Backed Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Videos": {
+      "main": [
+        [
+          {
+            "node": "Get All Data Table Records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If Already Backed Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Videos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Earliest to Latest": {
+      "main": [
+        [
+          {
+            "node": "Split Out Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Details": {
+      "main": [
+        [
+          {
+            "node": "Sort Earliest to Latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video IDs": {
+      "main": [
+        [
+          {
+            "node": "Get Video Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist Videos": {
+      "main": [
+        [
+          {
+            "node": "Extract Video IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Uploads Playlist ID": {
+      "main": [
+        [
+          {
+            "node": "Get Playlist Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get Uploads Playlist ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28bbfdfc971df976a30763a80880783b0da6d49b0f9e1c35d17278160b42ad72"
+  }
+}

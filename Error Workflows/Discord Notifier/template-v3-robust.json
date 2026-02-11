@@ -1,0 +1,188 @@
+{
+  "name": "Error Workflow - Discord Notifier (Robust)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger-id",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "config-webhook",
+              "name": "webhookUrl",
+              "value": "YOUR_DISCORD_WEBHOOK_URL",
+              "type": "string"
+            },
+            {
+              "id": "config-n8n-url",
+              "name": "n8nBaseUrl",
+              "value": "https://your-n8n-instance.com",
+              "type": "string"
+            },
+            {
+              "id": "config-env",
+              "name": "environment",
+              "value": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-node-id",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-name",
+              "name": "workflowName",
+              "value": "={{ $('Error Trigger').item.json.workflow?.name || 'Unknown Workflow' }}",
+              "type": "string"
+            },
+            {
+              "id": "workflow-id",
+              "name": "workflowId",
+              "value": "={{ $('Error Trigger').item.json.workflow?.id || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "execution-id",
+              "name": "executionId",
+              "value": "={{ $('Error Trigger').item.json.execution?.id || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "failed-node",
+              "name": "failedNode",
+              "value": "={{ $('Error Trigger').item.json.execution?.lastNodeExecuted || 'Unknown node' }}",
+              "type": "string"
+            },
+            {
+              "id": "error-msg",
+              "name": "errorMessage",
+              "value": "={{ $('Error Trigger').item.json.execution?.error?.message || $('Error Trigger').item.json.error?.message || 'Unknown error' }}",
+              "type": "string"
+            },
+            {
+              "id": "exec-mode",
+              "name": "executionMode",
+              "value": "={{ $('Error Trigger').item.json.execution?.mode || 'regular' }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "exec-url",
+              "name": "executionUrl",
+              "value": "={{ $('Configuration').item.json.n8nBaseUrl }}/workflow/{{ $json.workflowId }}/executions/{{ $json.executionId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-message-id",
+      "name": "Build Message Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').item.json.webhookUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"username\": \"n8n Alerts\",\n  \"avatar_url\": \"https://n8n.io/favicon.ico\",\n  \"embeds\": [\n    {\n      \"title\": \"🚨 Workflow Error Alert\",\n      \"description\": \"A workflow has failed and requires attention.\",\n      \"color\": 15548997,\n      \"fields\": [\n        {\n          \"name\": \"Workflow\",\n          \"value\": \"{{ $json.workflowName }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Environment\",\n          \"value\": \"{{ $('Configuration').item.json.environment }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Failed Node\",\n          \"value\": \"{{ $json.failedNode }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Execution Mode\",\n          \"value\": \"{{ $json.executionMode }}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Error Message\",\n          \"value\": \"```{{ $json.errorMessage }}```\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"Execution Link\",\n          \"value\": \"[View Execution]({{ $json.executionUrl }})\",\n          \"inline\": false\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Execution ID: {{ $json.executionId }} | Workflow ID: {{ $json.workflowId }}\"\n      },\n      \"timestamp\": \"{{ $json.timestamp }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "discord-node-id",
+      "name": "Send Discord Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error Workflow - Discord Notifier (Robust)\n\n**Most reliable version** - Extracts error data step-by-step for debugging.\n\n### Setup\n\n1. **Create Discord Webhook**:\n   - Server Settings → Integrations → Webhooks\n   - New Webhook → Copy URL\n\n2. **Update Configuration node**:\n   - `webhookUrl`: Your Discord webhook URL\n   - `n8nBaseUrl`: Your n8n instance URL  \n   - `environment`: production/staging\n\n3. **Link to workflows**:\n   - Open workflow to monitor\n   - Settings → Error Workflow\n   - Select this workflow\n\n### How It Works\n\n1. Error Trigger catches the error\n2. Configuration node sets your preferences\n3. **Build Message Data** extracts all fields individually\n   - This lets you see exactly what data is available\n   - Uses optional chaining (`?.`) to handle missing fields\n4. Send Discord Alert uses the extracted data\n\n### Debugging\n\nIf embed is empty:\n1. Check the output of \"Build Message Data\" node\n2. See what values it extracted\n3. Verify Error Trigger is receiving data\n4. Check execution logs for the failing workflow\n\n### Advantages\n\n- Extracts each field separately for visibility\n- Uses optional chaining for safety\n- Multiple fallbacks for error messages\n- Easy to debug if something is empty",
+        "height": 640,
+        "width": 700
+      },
+      "id": "sticky-instructions",
+      "name": "Sticky Note - Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Build Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Message Data": {
+      "main": [
+        [
+          {
+            "node": "Send Discord Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
